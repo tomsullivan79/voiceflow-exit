@@ -1,0 +1,8 @@
+:root { --max: 780px; font-family: system-ui, Arial, sans-serif; }
+body { margin:0; padding: 24px; display:flex; justify-content:center; }
+main { width:100%; max-width: var(--max); }
+.chat { border:1px solid #ddd; border-radius:12px; padding:16px; }
+.msg { margin:8px 0; }
+.msg.user { text-align:right; }
+button { padding:8px 12px; border-radius:8px; border:1px solid #ccc; background:#fff; cursor:pointer; }
+input, textarea { width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; }
