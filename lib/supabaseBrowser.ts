@@ -1,4 +1,6 @@
-import { createBrowserClient } from "@supabase/ssr";
+// lib/supabaseBrowser.ts
+'use client';
+import { createBrowserClient } from '@supabase/ssr';
 
 export function supabaseBrowser() {
   return createBrowserClient(

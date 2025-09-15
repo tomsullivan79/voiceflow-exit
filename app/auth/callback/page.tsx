@@ -1,29 +1,15 @@
-"use client";
-import { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import { Suspense } from "react";
+import CallbackClient from "./callback-client";
 
-export default function AuthCallback() {
-  const router = useRouter();
-  const params = useSearchParams();
+export const dynamic = "force-dynamic";
 
-  useEffect(() => {
-    const code = params.get("code");
-    const next = params.get("next") || "/"; // optional ?next=/somewhere
-    const run = async () => {
-      const sb = supabaseBrowser();
-      if (code) {
-        await sb.auth.exchangeCodeForSession({ code });
-      }
-      router.replace(next);
-    };
-    run();
-  }, [params, router]);
-
+export default function AuthCallbackPage() {
   return (
-    <main style={{ maxWidth: 520, margin: "40px auto", padding: 16 }}>
+    <main style={{ maxWidth: 640, margin: "40px auto", padding: 16 }}>
       <h1>Signing you in…</h1>
-      <p>This will take just a moment.</p>
+      <Suspense fallback={<p>Preparing session…</p>}>
+        <CallbackClient />
+      </Suspense>
     </main>
   );
 }
