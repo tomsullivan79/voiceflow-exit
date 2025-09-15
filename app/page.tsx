@@ -1,95 +1,113 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+import { useRef, useState } from "react";
 
 export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [input, setInput] = useState("");
+  const [streamed, setStreamed] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [remember, setRemember] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  async function onSend() {
+    setStreamed("");
+    setLoading(true);
+    abortRef.current = new AbortController();
+
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: input }],
+        remember,
+      }),
+      signal: abortRef.current.signal,
+    });
+
+    if (!res.ok || !res.body) {
+      setLoading(false);
+      setStreamed(`Error: ${res.status} ${res.statusText}`);
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      setStreamed((prev) => prev + decoder.decode(value, { stream: true }));
+    }
+    setLoading(false);
+    setRemember(false);
+  }
+
+  return (
+    <main style={{ maxWidth: 720, margin: "40px auto", padding: "0 16px" }}>
+      <h1>voiceflow-exit – local chat</h1>
+      <textarea
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        placeholder="Say something…"
+        rows={4}
+        style={{ width: "100%", padding: 12, marginTop: 16 }}
+      />
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button onClick={onSend} disabled={loading || !input.trim()}>
+          {loading ? "Streaming…" : "Send"}
+        </button>
+        {loading && (
+          <button
+            onClick={() => {
+              abortRef.current?.abort();
+              setLoading(false);
+            }}
           >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+            Stop
+          </button>
+        )}
+
+        <label
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
           />
-          Learn
+          Remember this
+        </label>
+      </div>
+
+      <h3 style={{ marginTop: 24 }}>Response</h3>
+      <pre
+        style={{
+          whiteSpace: "pre-wrap",
+          background: "#111",
+          color: "#eee",
+          padding: 12,
+          borderRadius: 8,
+          minHeight: 120,
+        }}
+      >
+        {streamed || "—"}
+      </pre>
+
+      {/* Helper Links */}
+      <section style={{ marginTop: 32 }}>
+        <h3>Helper Links</h3>
+        <br></br>
+        <a href="/memories" style={{ display: "inline-block" }}>
+          Memories
         </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
+        <div style={{ height: 12 }} />
+        
+        <a href="/ingest" style={{ display: "inline-block" }}>
+          Ingest
         </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </section>
+    </main>
   );
 }
