@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 
 export default function AuthPage() {
   return (
-    <main className="mx-auto max-w-md px-6 py-8 space-y-6">
-      <h1 className="text-2xl font-semibold">Sign in</h1>
+    <main style={{ maxWidth: 640, margin: "40px auto", padding: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 16 }}>Sign in</h1>
       <Suspense fallback={<p>Loading…</p>}>
         <AuthClient />
       </Suspense>
