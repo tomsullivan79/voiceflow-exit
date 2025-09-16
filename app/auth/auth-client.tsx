@@ -37,21 +37,31 @@ export default function AuthClient() {
 
     (async () => {
       try {
-        // 1) If magic-link hash present, create session FIRST, then clean URL
+        // 1) If magic-link hash present, persist session cookies via server route, then clean URL
         const hash = readHash();
         if (hash) {
-          if (hash.error_description) setError(hash.error_description);
+          if (hash.error_description) {
+            setError(hash.error_description);
+          }
           if (hash.access_token && hash.refresh_token) {
-            const { error: setErr } = await supabase.auth.setSession({
-              access_token: hash.access_token,
-              refresh_token: hash.refresh_token,
+            const r = await fetch("/api/auth/set", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                access_token: hash.access_token,
+                refresh_token: hash.refresh_token,
+              }),
             });
-            if (setErr) setError(setErr.message);
+            if (!r.ok) {
+              const j = await r.json().catch(() => ({}));
+              setError(j?.error || "Failed to persist session");
+            }
           }
           cleanUrl();
         }
 
-        // 2) Load current user
+        // 2) Load current user (client-side)
         const { data, error: getUserErr } = await supabase.auth.getUser();
         if (getUserErr) throw getUserErr;
 
@@ -65,7 +75,8 @@ export default function AuthClient() {
       }
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    // 3) Keep UI in sync
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
       setUser(session?.user ? { id: session.user.id, email: session.user.email } : null);
     });
 
@@ -87,7 +98,7 @@ export default function AuthClient() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          // Redirect back to /auth so this page can set the session & clean the URL.
+          // Redirect back to /auth so we can set HTTP-only cookies server-side.
           emailRedirectTo: `${window.location.origin}/auth`,
         },
       });
@@ -104,6 +115,13 @@ export default function AuthClient() {
     setError(null);
     try {
       await supabase.auth.signOut();
+      // Clear server cookies as well by making a dummy server call
+      await fetch("/api/auth/set", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ access_token: "", refresh_token: "" }),
+      }).catch(() => {});
     } catch (err: any) {
       setError(err?.message || "Sign-out failed");
     }
@@ -123,7 +141,7 @@ export default function AuthClient() {
             <label htmlFor="email" className="block text-sm font-medium">
               Email
             </label>
-            <input
+          <input
               id="email"
               name="email"
               type="email"
