@@ -1,168 +1,244 @@
 // app/cases/[id]/page.tsx
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
+import "server-only";
+import { createClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
-import Link from "next/link";
 import twilio from "twilio";
 
-export const dynamic = "force-dynamic";
-
-// ✅ close case
-export async function closeCase(formData: FormData) {
-  "use server";
-  const id = formData.get("id") as string;
-  if (!id) return;
-
-  const sb = supabaseAdmin();
-  await sb
-    .from("conversations")
-    .update({ status: "closed", updated_at: new Date().toISOString() })
-    .eq("id", id);
-
-  revalidatePath("/cases");
-  revalidatePath(`/cases/${id}`);
-  redirect("/cases");
+// ===== Supabase admin client =====
+function getAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  if (!url || !serviceKey) throw new Error("Missing Supabase env vars.");
+  return createClient(url, serviceKey, { auth: { persistSession: false } });
 }
 
-// ✅ reply via SMS (respects DISABLE_OUTBOUND_SMS)
+// ===== ENV =====
+const DISABLE_OUTBOUND_SMS = process.env.DISABLE_OUTBOUND_SMS === "true";
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID!;
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN!;
+const TWILIO_MESSAGING_SERVICE_SID = process.env.TWILIO_MESSAGING_SERVICE_SID!;
+
+// ===== Types (adjust if your schema differs) =====
+type Conversation = {
+  id: string;
+  title?: string | null;
+  /** E.164 recipient number (human). Change if your column is named differently. */
+  participant_phone?: string | null;
+};
+
+type ConversationMessage = {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  created_at: string;
+  message_sid: string | null;
+};
+
+// ===== Data access =====
+async function getConversationAndMessages(conversationId: string) {
+  const supabase = getAdminClient();
+
+  const { data: convo, error: convoErr } = await supabase
+    .from("conversations")
+    .select("*")
+    .eq("id", conversationId)
+    .single();
+
+  if (convoErr || !convo) throw new Error("Conversation not found");
+
+  const { data: messages, error: msgErr } = await supabase
+    .from("conversation_messages")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true });
+
+  if (msgErr) throw msgErr;
+
+  return {
+    conversation: convo as Conversation,
+    messages: (messages || []) as ConversationMessage[],
+  };
+}
+
+async function getLatestSmsStatus(messageSid: string) {
+  if (!messageSid) return null;
+  const supabase = getAdminClient();
+  const { data, error } = await supabase
+    .from("sms_events")
+    .select("*")
+    .eq("message_sid", messageSid)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return null;
+  return data as
+    | {
+        message_status: string | null;
+        error_code: string | null;
+        error_message: string | null;
+        created_at: string;
+      }
+    | null;
+}
+
+// ===== Server action: sendReply =====
 export async function sendReply(formData: FormData) {
   "use server";
-  const id = formData.get("id") as string;
-  const body = (formData.get("body") as string)?.trim();
-  if (!id || !body) return;
+  const supabase = getAdminClient();
 
-  const sb = supabaseAdmin();
-  const { data: conv } = await sb
-    .from("conversations")
-    .select("id, phone, status")
-    .eq("id", id)
+  const conversationId = String(formData.get("conversationId") || "");
+  const body = String(formData.get("body") || "").trim();
+  if (!conversationId || !body) return;
+
+  const { conversation } = await getConversationAndMessages(conversationId);
+
+  // Update this line if your recipient field is different
+  const to = (conversation.participant_phone || "").trim();
+  const initialContent = DISABLE_OUTBOUND_SMS
+    ? `${body}\n\n[not sent – A2P pending]`
+    : body;
+
+  // Insert assistant message first (we’ll update message_sid after sending)
+  const { data: inserted, error: insertErr } = await supabase
+    .from("conversation_messages")
+    .insert({
+      conversation_id: conversationId,
+      role: "assistant",
+      content: to ? initialContent : `${initialContent}\n\n[not sent – missing recipient number]`,
+      message_sid: null,
+    })
+    .select("id")
     .single();
 
-  if (!conv?.phone) return;
-
-  const disabled = process.env.DISABLE_OUTBOUND_SMS === "true";
-
-  // Only send when enabled
-  if (!disabled) {
-    const client = twilio(
-      process.env.TWILIO_ACCOUNT_SID!,
-      process.env.TWILIO_AUTH_TOKEN!
-    );
-
-    const statusCallback =
-      (process.env.NEXT_PUBLIC_SITE_URL || "https://app.wildtriage.org") +
-      "/api/sms/status";
-
-    const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-    const fromNumber = process.env.TWILIO_SMS_FROM;
-
-    const createArgs: any = {
-      to: conv.phone,
-      body,
-      statusCallback,
-    };
-    if (messagingServiceSid) createArgs.messagingServiceSid = messagingServiceSid;
-    else if (fromNumber) createArgs.from = fromNumber;
-
-    await client.messages.create(createArgs);
+  if (insertErr || !inserted) {
+    console.error("Failed to insert assistant message:", insertErr);
+    redirect(`/cases/${conversationId}`);
   }
 
-  // Always log to the case so UI stays consistent
-  await sb.from("conversation_messages").insert({
-    conversation_id: id,
-    role: "assistant",
-    content: disabled ? `[not sent – A2P pending] ${body}` : body,
-  });
+  const messageRowId = inserted.id as string;
 
-  revalidatePath(`/cases/${id}`);
+  // Respect A2P gate or missing number
+  if (DISABLE_OUTBOUND_SMS || !to) {
+    redirect(`/cases/${conversationId}`);
+  }
+
+  // Send via Twilio
+  try {
+    const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+    const sent = await client.messages.create({
+      to,
+      body,
+      messagingServiceSid: TWILIO_MESSAGING_SERVICE_SID,
+      // If your Messaging Service doesn’t already set this:
+      // statusCallback: "https://app.wildtriage.org/api/sms/status",
+    });
+
+    await supabase
+      .from("conversation_messages")
+      .update({ message_sid: sent.sid })
+      .eq("id", messageRowId);
+  } catch (err: any) {
+    console.error("Twilio send error:", err?.message || err);
+    await supabase
+      .from("conversation_messages")
+      .update({
+        content: `${initialContent}\n\n[send error: ${err?.message || "unknown"}]`,
+      })
+      .eq("id", messageRowId);
+  }
+
+  redirect(`/cases/${conversationId}`);
 }
 
-export default async function CaseDetail({ params }: { params: { id: string } }) {
-  // 🔐 require login
-  const sbAuth = await supabaseServerAuth();
-  const { data: { user } } = await sbAuth.auth.getUser();
-  if (!user) redirect("/auth");
+// ===== Page (server component) =====
+export default async function CasePage({ params }: { params: { id: string } }) {
+  const { conversation, messages } = await getConversationAndMessages(params.id);
 
-  const sb = supabaseAdmin();
-  const { data: conv } = await sb
-    .from("conversations")
-    .select("id, title, phone, status, created_at")
-    .eq("id", params.id)
-    .single();
-
-  const { data: msgs } = await sb
-    .from("conversation_messages")
-    .select("role, content, created_at")
-    .eq("conversation_id", params.id)
-    .order("created_at", { ascending: true })
-    .limit(500);
-
-  if (!conv) {
-    return <main style={{maxWidth:820, margin:"40px auto", padding:16}}>
-      <p><Link href="/cases">← Cases</Link></p>
-      <p style={{color:"tomato"}}>Case not found.</p>
-    </main>;
+  // Preload latest status for assistant messages with SID (SSR)
+  const statusBySid = new Map<string, Awaited<ReturnType<typeof getLatestSmsStatus>>>();
+  for (const m of messages) {
+    if (m.role === "assistant" && m.message_sid && !statusBySid.has(m.message_sid)) {
+      statusBySid.set(m.message_sid, await getLatestSmsStatus(m.message_sid));
+    }
   }
 
   return (
-    <main style={{maxWidth:820, margin:"40px auto", padding:16}}>
-      <p style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-        <Link href="/cases">← Cases</Link>
-        <form action={closeCase}>
-          <input type="hidden" name="id" value={conv.id} />
+    <div className="mx-auto max-w-3xl p-6 space-y-6">
+      <h1 className="text-2xl font-semibold">
+        Case: {conversation.title || conversation.id}
+      </h1>
+
+      <div className="space-y-4">
+        {messages.map((message) => {
+          const status =
+            message.role === "assistant" && message.message_sid
+              ? statusBySid.get(message.message_sid)
+              : null;
+
+          return (
+            <div key={message.id} className="rounded-md border p-3">
+              <div className="text-sm text-gray-500">
+                {message.role.toUpperCase()} •{" "}
+                {new Date(message.created_at).toLocaleString()}
+              </div>
+              <div className="mt-2 whitespace-pre-wrap">{message.content}</div>
+
+              {message.role === "assistant" && message.message_sid ? (
+                <div className="mt-3 text-xs text-gray-600 border-t pt-2">
+                  <div>
+                    <span className="font-medium">Delivery:</span>{" "}
+                    {status?.message_status ?? "—"}
+                  </div>
+                  {status?.error_code ? (
+                    <div>
+                      <span className="font-medium">ErrorCode:</span>{" "}
+                      {status.error_code}
+                      {status.error_message ? ` — ${status.error_message}` : ""}
+                    </div>
+                  ) : null}
+                  <div className="text-[11px] text-gray-500">
+                    SID: {message.message_sid} • Updated:{" "}
+                    {status?.created_at
+                      ? new Date(status.created_at).toLocaleString()
+                      : "—"}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      <form action={sendReply} className="mt-6 space-y-2">
+        <input type="hidden" name="conversationId" value={conversation.id} />
+        <textarea
+          name="body"
+          placeholder="Type your reply…"
+          className="w-full rounded-md border p-2"
+          rows={3}
+          required
+        />
+        <div className="flex items-center gap-3">
           <button
             type="submit"
-            style={{padding:"6px 10px", border:"1px solid #ccc", borderRadius:6}}
-            disabled={conv.status === "closed"}
-            title={conv.status === "closed" ? "Already closed" : "Close this case"}
+            className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-50"
+            disabled={DISABLE_OUTBOUND_SMS}
+            title={
+              DISABLE_OUTBOUND_SMS
+                ? "Outbound SMS disabled (A2P pending)"
+                : "Send SMS"
+            }
           >
-            {conv.status === "closed" ? "Closed" : "Close case"}
+            {DISABLE_OUTBOUND_SMS ? "Send (disabled)" : "Send"}
           </button>
-        </form>
-      </p>
-
-      <h1>{conv.title || "Case"}</h1>
-      <p style={{opacity:0.8}}>{conv.phone} · {conv.status} · {new Date(conv.created_at).toLocaleString()}</p>
-
-      <div style={{marginTop:16, border:"1px solid #eee", borderRadius:8, padding:12}}>
-        {(msgs||[]).map((m:any, i:number) => (
-          <div key={i} style={{padding:"8px 0", borderBottom: "1px solid #f3f3f3"}}>
-            <div style={{fontSize:12, opacity:0.7}}>
-              {m.role} · {new Date(m.created_at).toLocaleString()}
-            </div>
-            <div style={{whiteSpace:"pre-wrap"}}>{m.content}</div>
-          </div>
-        ))}
-        {(!msgs || msgs.length===0) && <p>No messages yet.</p>}
-      </div>
-
-      {/* Reply box */}
-      <div style={{marginTop:20, borderTop:"1px solid #eee", paddingTop:12}}>
-        <form action={sendReply} style={{display:"flex", gap:8}}>
-          <input type="hidden" name="id" value={conv.id} />
-          <input
-            name="body"
-            type="text"
-            placeholder="Type a reply to send via SMS…"
-            required
-            style={{flex:1, padding:"8px 10px", border:"1px solid #ccc", borderRadius:6}}
-          />
-          <button type="submit" style={{padding:"8px 12px"}} disabled={conv.status === "closed"}>
-            Send
-          </button>
-        </form>
-        {process.env.DISABLE_OUTBOUND_SMS === "true" && (
-          <p style={{marginTop:8, fontSize:12, opacity:0.7}}>
-            Outbound SMS is disabled (A2P pending). Replies will be logged but not sent.
-          </p>
-        )}
-        {conv.status === "closed" && (
-          <p style={{marginTop:4, fontSize:12, opacity:0.7}}>
-            Reopen by changing status in the database (or inbound SMS will start a new case).
-          </p>
-        )}
-      </div>
-    </main>
+          {DISABLE_OUTBOUND_SMS && (
+            <span className="text-xs text-gray-600">
+              Outbound disabled — messages will be saved as “[not sent – A2P pending]”
+            </span>
+          )}
+        </div>
+      </form>
+    </div>
   );
 }
