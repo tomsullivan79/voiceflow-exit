@@ -11,8 +11,7 @@ function readHash() {
   const raw = window.location.hash || "";
   if (!raw) return null;
   const params = new URLSearchParams(raw.replace(/^#/, ""));
-  const obj = Object.fromEntries(params.entries());
-  return obj as Record<string, string>;
+  return Object.fromEntries(params.entries()) as Record<string, string>;
 }
 
 function cleanUrl() {
@@ -30,7 +29,6 @@ export default function AuthClient() {
   const supabase = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    // Browser client: detectSessionInUrl defaults to true
     return createClient(url, anon);
   }, []);
 
@@ -39,22 +37,17 @@ export default function AuthClient() {
 
     (async () => {
       try {
-        // 1) If Supabase redirected here with tokens in the hash, set the session FIRST.
+        // 1) If magic-link hash present, create session FIRST, then clean URL
         const hash = readHash();
         if (hash) {
-          if (hash.error_description) {
-            // e.g., otp_expired
-            setError(hash.error_description);
-          }
+          if (hash.error_description) setError(hash.error_description);
           if (hash.access_token && hash.refresh_token) {
-            // Critical fix: create the session before cleaning the URL
             const { error: setErr } = await supabase.auth.setSession({
               access_token: hash.access_token,
               refresh_token: hash.refresh_token,
             });
             if (setErr) setError(setErr.message);
           }
-          // Clean the URL after we’ve processed any tokens/errors
           cleanUrl();
         }
 
@@ -63,14 +56,7 @@ export default function AuthClient() {
         if (getUserErr) throw getUserErr;
 
         if (!mounted) return;
-        const u = data.user ? { id: data.user.id, email: data.user.email } : null;
-        setUser(u);
-
-        // 3) If signed in and we’re on /auth, bounce to /
-        if (u && typeof window !== "undefined" && window.location.pathname === "/auth") {
-          window.location.replace("/");
-          return;
-        }
+        setUser(data.user ? { id: data.user.id, email: data.user.email } : null);
       } catch (e: any) {
         if (!mounted) return;
         setError(e?.message || "Failed to load session");
@@ -101,7 +87,7 @@ export default function AuthClient() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          // Redirect back to /auth, where we set the session & clean the URL, then go to /
+          // Redirect back to /auth so this page can set the session & clean the URL.
           emailRedirectTo: `${window.location.origin}/auth`,
         },
       });
@@ -123,51 +109,40 @@ export default function AuthClient() {
     }
   }
 
-  // ---------- UI ----------
   if (loading) return <p>Loading…</p>;
 
-  if (user) {
-    // Fallback UI if you hit /auth while already signed in (briefly visible before redirect)
-    return (
-      <div className="space-y-4">
+  return (
+    <div className="space-y-4">
+      {user ? (
         <div className="rounded border border-green-300 bg-green-50 p-3 text-green-800">
-          You are signed in as <span className="font-medium">{user.email || user.id}</span>.
+          Signed in as <span className="font-medium">{user.email || user.id}</span>.
         </div>
+      ) : (
+        <form onSubmit={handleSendMagicLink} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium">
+              Email
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              placeholder="you@example.org"
+              className="mt-1 w-full rounded border px-3 py-2"
+              required
+            />
+          </div>
+          <button type="submit" className="rounded bg-black px-4 py-2 text-white">
+            Send magic link
+          </button>
+        </form>
+      )}
+
+      {!user ? null : (
         <button onClick={handleSignOut} className="rounded bg-black px-4 py-2 text-white">
           Sign out
         </button>
-        {notice ? (
-          <div className="rounded border border-blue-300 bg-blue-50 p-2 text-sm text-blue-800">
-            {notice}
-          </div>
-        ) : null}
-        {error ? (
-          <div className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-700">
-            {error}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSendMagicLink} className="space-y-4">
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium">
-          Email
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          placeholder="you@example.org"
-          className="mt-1 w-full rounded border px-3 py-2"
-          required
-        />
-      </div>
-      <button type="submit" className="rounded bg-black px-4 py-2 text-white">
-        Send magic link
-      </button>
+      )}
 
       {notice ? (
         <div className="rounded border border-blue-300 bg-blue-50 p-2 text-sm text-blue-800">
@@ -179,6 +154,6 @@ export default function AuthClient() {
           {error}
         </div>
       ) : null}
-    </form>
+    </div>
   );
 }
