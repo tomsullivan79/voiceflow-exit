@@ -1,9 +1,16 @@
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 export default async function CasesPage() {
+  // 🔐 require login
+  const sbAuth = await supabaseServerAuth();
+  const { data: { user } } = await sbAuth.auth.getUser();
+  if (!user) redirect("/auth");
+
   const sb = supabaseAdmin();
   const { data, error } = await sb
     .from("conversations")
