@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE!;
   if (!url || !serviceKey) throw new Error("Missing Supabase env vars.");
   return createClient(url, serviceKey, { auth: { persistSession: false } });
 }
