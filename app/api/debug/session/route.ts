@@ -1,7 +1,7 @@
 // app/api/debug/session/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
 
 export const runtime = "nodejs";
 
@@ -10,9 +10,19 @@ export async function GET() {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const cookieStore = cookies();
 
-  const supabase = createClient(url, anon, {
-    auth: { persistSession: false, detectSessionInUrl: false },
-    global: { headers: { Cookie: cookieStore.toString() } },
+  const supabase = createServerClient(url, anon, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value;
+      },
+      // In route handlers, cookies() is mutable — this keeps auth helpers happy
+      set(name: string, value: string, options: any) {
+        cookieStore.set({ name, value, ...options });
+      },
+      remove(name: string, options: any) {
+        cookieStore.set({ name, value: "", ...options });
+      },
+    },
   });
 
   const { data, error } = await supabase.auth.getUser();
