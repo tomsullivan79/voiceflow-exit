@@ -108,25 +108,26 @@ export default function Home() {
           Ingest
         </a>
 
-        <br></br>
+        <div style={{ height: 12 }} />
         <a href="/auth" style={{ display: "inline-block" }}>
           Auth
         </a>
 
-        <br></br>
+        <div style={{ height: 12 }} />
         <a href="/sms" style={{ display: "inline-block" }}>
           SMS
         </a>
 
-         <br></br>
+         <div style={{ height: 12 }} />
         <a href="/cases" style={{ display: "inline-block" }}>
           Cases
         </a>
 
-          <br></br>
+          <div style={{ height: 12 }} />
         <a href="/api/debug/session" style={{ display: "inline-block" }}>
           API Debug Session
         </a>
+        <div style={{ height: 12 }} />
 
 
       </section>
