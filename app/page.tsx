@@ -41,7 +41,7 @@ export default function Home() {
 
   return (
     <main style={{ maxWidth: 720, margin: "40px auto", padding: "0 16px" }}>
-      <h1>voiceflow-exit – local chat</h1>
+      <h1>wildlife triage agent</h1>
       <textarea
         value={input}
         onChange={(e) => setInput(e.target.value)}
@@ -107,6 +107,28 @@ export default function Home() {
         <a href="/ingest" style={{ display: "inline-block" }}>
           Ingest
         </a>
+
+        <br></br>
+        <a href="/auth" style={{ display: "inline-block" }}>
+          Auth
+        </a>
+
+        <br></br>
+        <a href="/sms" style={{ display: "inline-block" }}>
+          SMS
+        </a>
+
+         <br></br>
+        <a href="/cases" style={{ display: "inline-block" }}>
+          Cases
+        </a>
+
+          <br></br>
+        <a href="/api/debug/session" style={{ display: "inline-block" }}>
+          API Debug Session
+        </a>
+
+
       </section>
     </main>
   );
