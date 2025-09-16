@@ -9,7 +9,8 @@ export const runtime = "nodejs";
 const MODEL_TEXT = process.env.OPENAI_MODEL_TEXT || "gpt-4o-mini";
 const MODEL_EMBED = process.env.OPENAI_MODEL_EMBED || "text-embedding-3-small";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://app.wildtriage.org";
-const TWILIO_STATUS_CB = `${SITE_URL}/api/sms/status`; // not enabled yet; safe to leave
+const TWILIO_STATUS_CB = `${SITE_URL}/api/sms/status`;
+const DISABLE_OUTBOUND = process.env.DISABLE_OUTBOUND_SMS === "true";
 
 function twimlMessage(text: string) {
   const safe = text.replace(/[^\S\r\n]+/g, " ");
@@ -20,13 +21,16 @@ function twimlMessage(text: string) {
 }
 
 async function embed(openai: OpenAI, text: string) {
-  const { data } = await openai.embeddings.create({ model: MODEL_EMBED, input: text });
+  const { data } = await openai.embeddings.create({
+    model: MODEL_EMBED,
+    input: text,
+  });
   return data[0].embedding;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    // Raw body (x-www-form-urlencoded)
+    // Twilio posts x-www-form-urlencoded
     const bodyText = await req.text();
     const params = Object.fromEntries(new URLSearchParams(bodyText));
     const signature = req.headers.get("x-twilio-signature");
@@ -40,6 +44,7 @@ export async function POST(req: NextRequest) {
       params,
     });
     if (!ok) {
+      // Silent 200 with empty TwiML = no retries, no response
       return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, {
         status: 200,
         headers: { "Content-Type": "text/xml" },
@@ -50,7 +55,7 @@ export async function POST(req: NextRequest) {
     const text = (params["Body"] || "").trim();
     const userId = `sms:${from}`;
 
-    // Compliance keywords — let Twilio's Advanced Opt-Out handle the reply.
+    // Compliance keywords — let Twilio Advanced Opt-Out handle replies
     const kw = text.toUpperCase();
     if (["STOP","STOPALL","UNSUBSCRIBE","CANCEL","END","QUIT","HELP","START","UNSTOP"].includes(kw)) {
       return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, {
@@ -59,7 +64,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (!text) {
-      return new Response(twimlMessage(""), { headers: { "Content-Type": "text/xml" } });
+      return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, {
+        headers: { "Content-Type": "text/xml" },
+      });
     }
 
     const sb = supabaseAdmin();
@@ -67,8 +74,7 @@ export async function POST(req: NextRequest) {
 
     // --- Get or create an OPEN conversation for this phone ---
     let conversationId: string | null = null;
-
-    const { data: existing, error: findErr } = await sb
+    const { data: existing } = await sb
       .from("conversations")
       .select("id")
       .eq("user_id", userId)
@@ -77,25 +83,19 @@ export async function POST(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(1);
 
-    if (findErr) console.error("find conversation error:", findErr);
-
     if (existing && existing.length) {
       conversationId = existing[0].id;
     } else {
       const title = text.slice(0, 80) || "Conversation";
-      const { data: created, error: createErr } = await sb
+      const { data: created } = await sb
         .from("conversations")
         .insert({ user_id: userId, channel: "sms", phone: from, title, status: "open" })
         .select("id")
         .single();
-      if (createErr) {
-        console.error("create conversation error:", createErr);
-      } else {
-        conversationId = created?.id || null;
-      }
+      conversationId = created?.id || null;
     }
 
-    // Log user's inbound message (best-effort)
+    // Log inbound message
     if (conversationId) {
       await sb.from("conversation_messages").insert({
         conversation_id: conversationId,
@@ -107,10 +107,14 @@ export async function POST(req: NextRequest) {
     // Retrieval (memories + docs)
     const qEmb = await embed(openai, text);
     const { data: mem } = await sb.rpc("match_memories_l2", {
-      query_embedding: qEmb, for_user: userId, match_count: 5,
+      query_embedding: qEmb,
+      for_user: userId,
+      match_count: 5,
     });
     const { data: docs } = await sb.rpc("match_doc_chunks_l2", {
-      query_embedding: qEmb, for_user: userId, match_count: 8,
+      query_embedding: qEmb,
+      for_user: userId,
+      match_count: 8,
     });
 
     const memBlock = (mem || []).map((m: any, i: number) => `MEM #${i + 1}: ${m.content}`).join("\n");
@@ -130,25 +134,34 @@ export async function POST(req: NextRequest) {
       max_tokens: 300,
     });
 
-    const reply = completion.choices?.[0]?.message?.content?.trim()
-      || "Sorry, I couldn’t generate a reply.";
+    const rawReply =
+      completion.choices?.[0]?.message?.content?.trim() ||
+      "Sorry, I couldn’t generate a reply.";
 
-    // Log assistant's reply (best-effort)
+    // Log assistant reply (note: mark if outbound disabled)
+    const replyToStore = DISABLE_OUTBOUND ? `[not sent – A2P pending] ${rawReply}` : rawReply;
     if (conversationId) {
       await sb.from("conversation_messages").insert({
         conversation_id: conversationId,
         role: "assistant",
-        content: reply,
+        content: replyToStore,
       });
     }
 
-    // Respond with TwiML (includes statusCallback URL but that's fine if not enabled yet)
-    return new Response(twimlMessage(reply.slice(0, 1500)), {
+    // If outbound is disabled, return EMPTY TwiML (no SMS attempt)
+    if (DISABLE_OUTBOUND) {
+      return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
+    // Otherwise, send the SMS
+    return new Response(twimlMessage(rawReply.slice(0, 1500)), {
       headers: { "Content-Type": "text/xml" },
     });
   } catch (e: any) {
     console.error("twilio webhook error:", e);
-    return new Response(twimlMessage("Server error."), {
+    return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, {
       status: 200,
       headers: { "Content-Type": "text/xml" },
     });
