@@ -6,21 +6,15 @@ import { createClient } from "@supabase/supabase-js";
 
 type UserLite = { id: string; email?: string | null };
 
-function parseHash() {
-  // Supabase appends tokens or errors after redirect as a URL hash (#...).
-  const h = typeof window !== "undefined" ? window.location.hash : "";
-  const params = new URLSearchParams(h.startsWith("#") ? h.slice(1) : h);
-  return {
-    hasHash: !!h,
-    error: params.get("error"),
-    error_code: params.get("error_code"),
-    error_description: params.get("error_description"),
-    access_token: params.get("access_token"),
-    refresh_token: params.get("refresh_token"),
-    expires_in: params.get("expires_in"),
-    token_type: params.get("token_type"),
-    code: params.get("code"), // OAuth code (not typical for magic link)
-  };
+function readAndCleanHash() {
+  if (typeof window === "undefined") return null;
+  const raw = window.location.hash || "";
+  if (!raw) return null;
+  const params = new URLSearchParams(raw.replace(/^#/, ""));
+  const obj = Object.fromEntries(params.entries());
+  // Clean the URL bar immediately
+  window.history.replaceState({}, "", window.location.pathname);
+  return obj;
 }
 
 export default function AuthClient() {
@@ -35,41 +29,30 @@ export default function AuthClient() {
     return createClient(url, anon);
   }, []);
 
-  // Handle redirect hash (tokens or errors), load user, and subscribe to changes
   useEffect(() => {
     let mounted = true;
 
     (async () => {
       try {
-        // 1) If Supabase appended a hash (tokens or errors), handle it gracefully
-        const hash = parseHash();
-
-        if (hash.hasHash) {
-          if (hash.error) {
-            // Example: otp_expired, access_denied, etc.
-            setError(
-              hash.error_description ||
-                `Authentication error (${hash.error_code || hash.error}).`
-            );
-          }
-
-          // For OAuth code flow we could exchange with:
-          // if (hash.code) await supabase.auth.exchangeCodeForSession(hash.code);
-          // For email magic links, supabase-js automatically picks tokens from the hash on first auth call.
-
-          // Clean the URL (remove the hash so you get a nice, clean address bar)
-          // Do this regardless of error/success so the URL is clean post-redirect.
-          if (typeof window !== "undefined") {
-            window.history.replaceState({}, "", window.location.pathname);
-          }
+        // Handle any Supabase-auth hash if present (tokens or errors)
+        const hashObj = readAndCleanHash();
+        if (hashObj?.error_description) {
+          setError(hashObj.error_description);
         }
 
-        // 2) Load current user
+        // Fetch current user (supabase-js picks up session from hash automatically)
         const { data, error: getUserErr } = await supabase.auth.getUser();
         if (getUserErr) throw getUserErr;
 
         if (!mounted) return;
-        setUser(data.user ? { id: data.user.id, email: data.user.email } : null);
+        const u = data.user ? { id: data.user.id, email: data.user.email } : null;
+        setUser(u);
+
+        // If we’re on /auth and already signed in, bounce to /
+        if (typeof window !== "undefined" && u && window.location.pathname === "/auth") {
+          window.location.replace("/");
+          return;
+        }
       } catch (e: any) {
         if (!mounted) return;
         setError(e?.message || "Failed to load session");
@@ -78,7 +61,6 @@ export default function AuthClient() {
       }
     })();
 
-    // 3) Stay in sync with future changes (e.g., sign out)
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ? { id: session.user.id, email: session.user.email } : null);
     });
@@ -93,7 +75,6 @@ export default function AuthClient() {
     e.preventDefault();
     setNotice(null);
     setError(null);
-
     const form = new FormData(e.currentTarget);
     const email = String(form.get("email") || "").trim();
     if (!email) return;
@@ -101,7 +82,11 @@ export default function AuthClient() {
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: `${window.location.origin}/` }, // redirect to home (clean URL)
+        options: {
+          // IMPORTANT: redirect back to /auth so we can parse & clean the hash,
+          // then we immediately send the user to / with a clean URL.
+          emailRedirectTo: `${window.location.origin}/auth`,
+        },
       });
       if (error) throw error;
       setNotice("Magic link sent. Check your email.");
@@ -125,6 +110,7 @@ export default function AuthClient() {
   if (loading) return <p>Loading…</p>;
 
   if (user) {
+    // While we auto-redirect to / above, this is a safe fallback.
     return (
       <div className="space-y-4">
         <div className="rounded border border-green-300 bg-green-50 p-3 text-green-800">
