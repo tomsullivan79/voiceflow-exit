@@ -33,11 +33,8 @@ async function requireSession(url: string, anon: string) {
   const cookieStore = cookies();
   const supabase = createServerClient(url, anon, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
-      },
-      // no-ops in server components (prevents “Cookies can only be modified…” error)
-      set() {},
+      get(name: string) { return cookieStore.get(name)?.value; },
+      set() {}, // no-ops in server components
       remove() {},
     },
   });
@@ -87,8 +84,31 @@ async function fetchEvents(url: string, service: string, sp: SearchParams) {
   return (data || []) as SmsEvent[];
 }
 
+// High-contrast status chip
 function StatusBadge({ status }: { status: string | null }) {
-  return <span>{status || "—"}</span>;
+  const s = (status || "").toLowerCase();
+  let bg = "#e5e7eb"; // neutral
+  let fg = "#111827";
+  if (s === "delivered") { bg = "#d1fae5"; fg = "#065f46"; }        // green
+  else if (s === "failed" || s === "undelivered") { bg = "#fee2e2"; fg = "#991b1b"; } // red
+  else if (s === "sent" || s === "queued" || s === "accepted") { bg = "#dbeafe"; fg = "#1e40af"; } // blue
+  else if (s === "receiving" || s === "received") { bg = "#ede9fe"; fg = "#5b21b6"; } // purple
+
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "2px 8px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 600,
+        background: bg,
+        color: fg,
+      }}
+    >
+      {status || "—"}
+    </span>
+  );
 }
 
 function explainTwilioError(code?: string | null) {
@@ -109,8 +129,8 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
   if (missing.length > 0) {
     return (
       <main style={{ maxWidth: 1024, margin: "32px auto", padding: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 16 }}>SMS Delivery Log</h1>
-        <div style={{ padding: 12, border: "1px solid #fecaca", background: "#fef2f2" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 16, color: "#f9fafb" }}>SMS Delivery Log</h1>
+        <div style={{ padding: 12, border: "1px solid #fecaca", background: "#fef2f2", color: "#991b1b" }}>
           Missing required environment variables: <b>{missing.join(", ")}</b>.
         </div>
       </main>
@@ -124,29 +144,48 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
   const message_status = readParam(searchParams, "message_status");
   const limit = readParam(searchParams, "limit", "200");
 
+  // reusable colors for high contrast inside white cards
+  const cardText = "#111827";
+  const cardSubtle = "#4b5563";
+  const border = "#d1d5db";
+  const headerBg = "#e5e7eb";
+  const pageTitle = "#f9fafb";
+  const pageSub = "#cbd5e1";
+
   return (
     <main style={{ maxWidth: 1024, margin: "32px auto", padding: 24 }}>
       <div>
-        <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 4 }}>SMS Delivery Log</h1>
-        <p style={{ color: "#6b7280", fontSize: 14, marginBottom: 16 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4, color: pageTitle }}>SMS Delivery Log</h1>
+        <p style={{ color: pageSub, fontSize: 14, marginBottom: 16 }}>
           Search and inspect delivery receipts from Twilio.
         </p>
       </div>
 
       {/* Filters */}
-      <div style={{ border: "1px solid #e5e7eb", background: "#fff", padding: 16, marginBottom: 16 }}>
+      <div style={{ border: `1px solid ${border}`, background: "#ffffff", padding: 16, marginBottom: 16, color: cardText }}>
         <form method="get" action="/sms" style={{ display: "grid", gap: 12, gridTemplateColumns: "2fr 1fr 1fr 1fr" }}>
           <div>
-            <label htmlFor="q" style={{ display: "block", fontSize: 12, color: "#6b7280" }}>
+            <label htmlFor="q" style={{ display: "block", fontSize: 12, color: cardSubtle }}>
               Search (SID, To, From)
             </label>
-            <input id="q" name="q" defaultValue={q} placeholder="e.g., SM..., +1555..." style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 4 }} />
+            <input
+              id="q"
+              name="q"
+              defaultValue={q}
+              placeholder="e.g., SM..., +1555..."
+              style={{ width: "100%", padding: "8px 10px", border: `1px solid ${border}`, borderRadius: 4, color: cardText, background: "#fff" }}
+            />
           </div>
           <div>
-            <label htmlFor="message_status" style={{ display: "block", fontSize: 12, color: "#6b7280" }}>
+            <label htmlFor="message_status" style={{ display: "block", fontSize: 12, color: cardSubtle }}>
               Status
             </label>
-            <select id="message_status" name="message_status" defaultValue={message_status} style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 4 }}>
+            <select
+              id="message_status"
+              name="message_status"
+              defaultValue={message_status}
+              style={{ width: "100%", padding: "8px 10px", border: `1px solid ${border}`, borderRadius: 4, color: cardText, background: "#fff" }}
+            >
               <option value="">(any)</option>
               <option value="accepted">accepted</option>
               <option value="queued">queued</option>
@@ -160,16 +199,21 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
             </select>
           </div>
           <div>
-            <label htmlFor="limit" style={{ display: "block", fontSize: 12, color: "#6b7280" }}>
+            <label htmlFor="limit" style={{ display: "block", fontSize: 12, color: cardSubtle }}>
               Limit
             </label>
-            <input id="limit" name="limit" defaultValue={limit} style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 4 }} />
+            <input
+              id="limit"
+              name="limit"
+              defaultValue={limit}
+              style={{ width: "100%", padding: "8px 10px", border: `1px solid ${border}`, borderRadius: 4, color: cardText, background: "#fff" }}
+            />
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "end" }}>
-            <button type="submit" style={{ flex: 1, padding: "8px 12px", background: "#111827", color: "#fff", borderRadius: 4 }}>
+            <button type="submit" style={{ flex: 1, padding: "8px 12px", background: "#111827", color: "#ffffff", borderRadius: 4 }}>
               Apply
             </button>
-            <a href="/sms" style={{ flex: 1, padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 4, textAlign: "center", fontSize: 14 }}>
+            <a href="/sms" style={{ flex: 1, padding: "8px 12px", border: `1px solid ${border}`, borderRadius: 4, textAlign: "center", fontSize: 14, color: cardText, background: "#fff" }}>
               Clear
             </a>
           </div>
@@ -177,23 +221,20 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
       </div>
 
       {/* Table */}
-      <div style={{ overflowX: "auto", border: "1px solid #e5e7eb", background: "#fff" }}>
-        <table style={{ width: "100%", fontSize: 14, borderCollapse: "collapse" }}>
-          <thead style={{ background: "#f9fafb", textAlign: "left" }}>
+      <div style={{ overflowX: "auto", border: `1px solid ${border}`, background: "#ffffff", color: cardText }}>
+        <table style={{ width: "100%", fontSize: 14, borderCollapse: "collapse", color: cardText }}>
+          <thead style={{ background: headerBg, textAlign: "left", color: cardText }}>
             <tr>
-              <th style={{ padding: 12 }}>Time</th>
-              <th style={{ padding: 12 }}>SID</th>
-              <th style={{ padding: 12 }}>To</th>
-              <th style={{ padding: 12 }}>From</th>
-              <th style={{ padding: 12 }}>Status</th>
-              <th style={{ padding: 12 }}>Error</th>
+              {["Time", "SID", "To", "From", "Status", "Error"].map((h) => (
+                <th key={h} style={{ padding: 12, fontWeight: 700, borderBottom: `1px solid ${border}` }}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {events.map((e) => {
               const errTip = explainTwilioError(e.error_code);
               return (
-                <tr key={e.id} style={{ borderTop: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                <tr key={e.id} style={{ borderTop: `1px solid ${border}`, verticalAlign: "top" }}>
                   <td style={{ padding: 12, whiteSpace: "nowrap" }}>{new Date(e.created_at).toLocaleString()}</td>
                   <td style={{ padding: 12, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{e.message_sid || "—"}</td>
                   <td style={{ padding: 12 }}>{e.to_number || "—"}</td>
@@ -202,9 +243,11 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
                   <td style={{ padding: 12 }}>
                     {e.error_code ? (
                       <div>
-                        <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12 }}>Code {e.error_code}</div>
-                        {errTip ? <div style={{ fontSize: 12, color: "#6b7280" }}>{errTip}</div> : null}
-                        {e.error_message ? <div style={{ fontSize: 12, color: "#6b7280" }}>{e.error_message}</div> : null}
+                        <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: "#111827" }}>
+                          Code {e.error_code}
+                        </div>
+                        {errTip ? <div style={{ fontSize: 12, color: cardSubtle }}>{errTip}</div> : null}
+                        {e.error_message ? <div style={{ fontSize: 12, color: cardSubtle }}>{e.error_message}</div> : null}
                       </div>
                     ) : "—"}
                   </td>
@@ -213,14 +256,14 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
             })}
             {events.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: 16, textAlign: "center", color: "#6b7280" }}>No events found.</td>
+                <td colSpan={6} style={{ padding: 16, textAlign: "center", color: cardSubtle }}>No events found.</td>
               </tr>
             ) : null}
           </tbody>
         </table>
       </div>
 
-      <p style={{ color: "#6b7280", fontSize: 12 }}>Showing up to {limit} most recent events.</p>
+      <p style={{ color: pageSub, fontSize: 12, marginTop: 8 }}>Showing up to {limit} most recent events.</p>
     </main>
   );
 }
