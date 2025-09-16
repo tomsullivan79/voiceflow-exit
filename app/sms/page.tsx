@@ -34,7 +34,7 @@ function getAdminClient(url: string, service: string) {
   return createClient(url, service, { auth: { persistSession: false } });
 }
 
-/** Auth gate that can actually read HTTP-only cookies on the server */
+/** Server auth gate: read cookies, but DON'T set/remove in a server component */
 async function requireSession(url: string, anon: string) {
   const cookieStore = cookies();
   const supabase = createServerClient(url, anon, {
@@ -42,11 +42,11 @@ async function requireSession(url: string, anon: string) {
       get(name: string) {
         return cookieStore.get(name)?.value;
       },
-      set(name: string, value: string, options: any) {
-        cookieStore.set({ name, value, ...options });
+      set() {
+        // no-op in server components
       },
-      remove(name: string, options: any) {
-        cookieStore.set({ name, value: "", ...options });
+      remove() {
+        // no-op in server components
       },
     },
   });
