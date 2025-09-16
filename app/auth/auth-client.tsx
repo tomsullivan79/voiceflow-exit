@@ -1,43 +1,119 @@
+// app/auth/auth-client.tsx
 "use client";
 
-import { useState } from "react";
-import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+type UserLite = { id: string; email?: string | null };
 
 export default function AuthClient() {
-  const sb = supabaseBrowser();
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<UserLite | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  async function onSubmit(e: React.FormEvent) {
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    return createClient(url, anon);
+  }, []);
+
+  // Load current user and subscribe to auth changes
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        if (!mounted) return;
+        setUser(data.user ? { id: data.user.id, email: data.user.email } : null);
+      } catch (e: any) {
+        if (!mounted) return;
+        setError(e?.message || "Failed to load session");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ? { id: session.user.id, email: session.user.email } : null);
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  async function handleSendMagicLink(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setStatus("Sending…");
+    const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") || "").trim();
+    if (!email) return;
+
     try {
-      const { error } = await sb.auth.signInWithOtp({
+      const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        options: { emailRedirectTo: `${window.location.origin}/` },
       });
-      if (error) setStatus(`Error: ${error.message}`);
-      else setStatus("Check your email for the sign-in link.");
+      if (error) throw error;
+      alert("Magic link sent! Check your email.");
+      (e.target as HTMLFormElement).reset();
     } catch (err: any) {
-      setStatus(`Error: ${err?.message || String(err)}`);
+      alert(err?.message || "Error sending magic link");
     }
   }
 
+  async function handleSignOut() {
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // ----- UI -----
+  if (loading) return <p>Loading…</p>;
+
+  if (user) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded border border-green-300 bg-green-50 p-3 text-green-800">
+          You are signed in as <span className="font-medium">{user.email || user.id}</span>.
+        </div>
+        <button
+          onClick={handleSignOut}
+          className="rounded bg-black px-4 py-2 text-white"
+        >
+          Sign out
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={onSubmit} style={{ marginTop: 16 }}>
-      <label style={{ display: "block", marginBottom: 8 }}>
-        Email
+    <form onSubmit={handleSendMagicLink} className="space-y-4">
+      <div>
+        <label htmlFor="email" className="block text-sm font-medium">
+          Email
+        </label>
         <input
+          id="email"
+          name="email"
           type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.org"
-          style={{ display: "block", width: "100%", padding: 8, marginTop: 6 }}
+          className="mt-1 w-full rounded border px-3 py-2"
+          required
         />
-      </label>
-      <button type="submit" style={{ padding: "8px 12px" }}>Send magic link</button>
-      {status && <p style={{ marginTop: 12, opacity: 0.8 }}>{status}</p>}
+      </div>
+      <button type="submit" className="rounded bg-black px-4 py-2 text-white">
+        Send magic link
+      </button>
+      {error ? (
+        <div className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-700">
+          Error: {error}
+        </div>
+      ) : null}
     </form>
   );
 }
