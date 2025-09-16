@@ -37,12 +37,12 @@ export default function AuthClient() {
 
     (async () => {
       try {
-        // 1) If magic-link hash present, persist session cookies via server route, then clean URL
         const hash = readHash();
         if (hash) {
-          if (hash.error_description) {
-            setError(hash.error_description);
-          }
+          // Show inline error if Supabase appended one
+          if (hash.error_description) setError(hash.error_description);
+
+          // Persist to HTTP-only cookies via our server route
           if (hash.access_token && hash.refresh_token) {
             const r = await fetch("/api/auth/set", {
               method: "POST",
@@ -61,7 +61,6 @@ export default function AuthClient() {
           cleanUrl();
         }
 
-        // 2) Load current user (client-side)
         const { data, error: getUserErr } = await supabase.auth.getUser();
         if (getUserErr) throw getUserErr;
 
@@ -75,7 +74,6 @@ export default function AuthClient() {
       }
     })();
 
-    // 3) Keep UI in sync
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
       setUser(session?.user ? { id: session.user.id, email: session.user.email } : null);
     });
@@ -98,7 +96,7 @@ export default function AuthClient() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          // Redirect back to /auth so we can set HTTP-only cookies server-side.
+          // Redirect back to /auth to finalize cookies server-side
           emailRedirectTo: `${window.location.origin}/auth`,
         },
       });
@@ -115,7 +113,7 @@ export default function AuthClient() {
     setError(null);
     try {
       await supabase.auth.signOut();
-      // Clear server cookies as well by making a dummy server call
+      // Best-effort clear cookies on server as well
       await fetch("/api/auth/set", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -132,16 +130,21 @@ export default function AuthClient() {
   return (
     <div className="space-y-4">
       {user ? (
-        <div className="rounded border border-green-300 bg-green-50 p-3 text-green-800">
-          Signed in as <span className="font-medium">{user.email || user.id}</span>.
-        </div>
+        <>
+          <div className="rounded border border-green-300 bg-green-50 p-3 text-green-800">
+            Signed in as <span className="font-medium">{user.email || user.id}</span>.
+          </div>
+          <button onClick={handleSignOut} className="rounded bg-black px-4 py-2 text-white">
+            Sign out
+          </button>
+        </>
       ) : (
         <form onSubmit={handleSendMagicLink} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium">
               Email
             </label>
-          <input
+            <input
               id="email"
               name="email"
               type="email"
@@ -156,17 +159,13 @@ export default function AuthClient() {
         </form>
       )}
 
-      {!user ? null : (
-        <button onClick={handleSignOut} className="rounded bg-black px-4 py-2 text-white">
-          Sign out
-        </button>
-      )}
-
       {notice ? (
         <div className="rounded border border-blue-300 bg-blue-50 p-2 text-sm text-blue-800">
           {notice}
         </div>
       ) : null}
+
+      {/* Only show actionable errors; never render any legacy static string */}
       {error ? (
         <div className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-700">
           {error}
