@@ -19,6 +19,17 @@ function getEnv() {
   return { url, anon, service, missing };
 }
 
+/** Robustly read a search param that might be string | string[] | undefined */
+function readParam(
+  sp: Record<string, string | string[] | undefined>,
+  key: string,
+  fallback = ""
+) {
+  const v = sp?.[key];
+  if (Array.isArray(v)) return String(v[0] ?? fallback);
+  return typeof v === "string" ? v : fallback;
+}
+
 /** Admin client (service role) for reading sms_events */
 function getAdminClient(url: string, service: string) {
   return createClient(url, service, { auth: { persistSession: false } });
@@ -55,23 +66,36 @@ type SmsEvent = {
   created_at: string;
 };
 
-type SearchParams = { q?: string; status?: string; limit?: string };
+type SearchParams = Record<string, string | string[] | undefined>;
 
-async function fetchEvents(url: string, service: string, searchParams: SearchParams) {
+async function fetchEvents(url: string, service: string, sp: SearchParams) {
   const supabase = getAdminClient(url, service);
 
-  const q = (searchParams.q || "").trim();
-  const status = (searchParams.status || "").trim();
-  const limit = Math.min(Math.max(parseInt(searchParams.limit || "200", 10) || 200, 1), 1000);
+  const q = readParam(sp, "q").trim();
+  const status = readParam(sp, "status").trim().toLowerCase();
+  const limitNum = Math.min(
+    Math.max(parseInt(readParam(sp, "limit", "200"), 10) || 200, 1),
+    1000
+  );
 
   let query = supabase
     .from("sms_events")
-    .select("id,message_sid,to_number,from_number,message_status,error_code,error_message,created_at")
+    .select(
+      "id,message_sid,to_number,from_number,message_status,error_code,error_message,created_at"
+    )
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .limit(limitNum);
 
   if (status) query = query.eq("message_status", status);
-  if (q) query = query.or([`message_sid.ilike.%${q}%`, `to_number.ilike.%${q}%`, `from_number.ilike.%${q}%`].join(","));
+  if (q) {
+    query = query.or(
+      [
+        `message_sid.ilike.%${q}%`,
+        `to_number.ilike.%${q}%`,
+        `from_number.ilike.%${q}%`,
+      ].join(",")
+    );
+  }
 
   const { data, error } = await query;
   if (error) throw error;
@@ -82,26 +106,40 @@ function StatusBadge({ status }: { status: string | null }) {
   const s = (status || "").toLowerCase();
   let cls = "inline-block rounded px-2 py-0.5 text-xs border";
   if (s === "delivered") cls += " bg-green-50 text-green-700 border-green-200";
-  else if (s === "undelivered" || s === "failed") cls += " bg-red-50 text-red-700 border-red-200";
-  else if (s === "sent" || s === "queued" || s === "accepted") cls += " bg-blue-50 text-blue-700 border-blue-200";
-  else if (s === "receiving" || s === "received") cls += " bg-purple-50 text-purple-700 border-purple-200";
+  else if (s === "undelivered" || s === "failed")
+    cls += " bg-red-50 text-red-700 border-red-200";
+  else if (s === "sent" || s === "queued" || s === "accepted")
+    cls += " bg-blue-50 text-blue-700 border-blue-200";
+  else if (s === "receiving" || s === "received")
+    cls += " bg-purple-50 text-purple-700 border-purple-200";
   else cls += " bg-gray-50 text-gray-700 border-gray-200";
   return <span className={cls}>{status || "—"}</span>;
 }
 
 function explainTwilioError(code?: string | null) {
   switch (code) {
-    case "30003": return "Unreachable handset (off/out of service).";
-    case "30004": return "Blocked by carrier or user.";
-    case "30005": return "Unknown or inactive number.";
-    case "30006": return "Landline or unreachable route.";
-    case "30007": return "Carrier filter (spam).";
-    case "30034": return "A2P 10DLC registration/campaign issue.";
-    default: return null;
+    case "30003":
+      return "Unreachable handset (off/out of service).";
+    case "30004":
+      return "Blocked by carrier or user.";
+    case "30005":
+      return "Unknown or inactive number.";
+    case "30006":
+      return "Landline or unreachable route.";
+    case "30007":
+      return "Carrier filter (spam).";
+    case "30034":
+      return "A2P 10DLC registration/campaign issue.";
+    default:
+      return null;
   }
 }
 
-export default async function SmsLogPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function SmsLogPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const { url, anon, service, missing } = getEnv();
 
   if (missing.length > 0) {
@@ -118,39 +156,78 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
   await requireSession(url!, anon!);
   const events = await fetchEvents(url!, service!, searchParams);
 
-  const q = searchParams.q || "";
-  const status = searchParams.status || "";
-  const limit = searchParams.limit || "200";
+  // Persist current values in the form
+  const q = readParam(searchParams, "q");
+  const status = readParam(searchParams, "status");
+  const limit = readParam(searchParams, "limit", "200");
 
   return (
     <div className="mx-auto max-w-6xl p-8 space-y-8">
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold">SMS Delivery Log</h1>
-        <p className="text-sm text-gray-600">Search and inspect delivery receipts from Twilio.</p>
+        <p className="text-sm text-gray-600">
+          Search and inspect delivery receipts from Twilio.
+        </p>
       </div>
 
       {/* Filters */}
       <div className="rounded-lg border bg-white p-4 md:p-6">
-        <form className="grid grid-cols-1 gap-4 md:grid-cols-4 md:items-end">
-          <div className="flex flex-col">
-            <label className="text-xs text-gray-600" htmlFor="q">Search (SID, To, From)</label>
-            <input id="q" name="q" defaultValue={q} className="rounded border px-2 py-2" placeholder="e.g., SM..., +1555..." />
+        <form method="get" className="grid grid-cols-1 gap-4 md:grid-cols-5 md:items-end">
+          <div className="flex flex-col md:col-span-2">
+            <label className="text-xs text-gray-600" htmlFor="q">
+              Search (SID, To, From)
+            </label>
+            <input
+              id="q"
+              name="q"
+              defaultValue={q}
+              className="rounded border px-2 py-2"
+              placeholder="e.g., SM..., +1555..."
+            />
           </div>
           <div className="flex flex-col">
-            <label className="text-xs text-gray-600" htmlFor="status">Status</label>
-            <select id="status" name="status" defaultValue={status} className="rounded border px-2 py-2">
+            <label className="text-xs text-gray-600" htmlFor="status">
+              Status
+            </label>
+            <select
+              id="status"
+              name="status"
+              defaultValue={status}
+              className="rounded border px-2 py-2"
+            >
               <option value="">(any)</option>
-              <option>accepted</option><option>queued</option><option>sending</option><option>sent</option>
-              <option>delivered</option><option>undelivered</option><option>failed</option>
-              <option>receiving</option><option>received</option>
+              <option value="accepted">accepted</option>
+              <option value="queued">queued</option>
+              <option value="sending">sending</option>
+              <option value="sent">sent</option>
+              <option value="delivered">delivered</option>
+              <option value="undelivered">undelivered</option>
+              <option value="failed">failed</option>
+              <option value="receiving">receiving</option>
+              <option value="received">received</option>
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="text-xs text-gray-600" htmlFor="limit">Limit</label>
-            <input id="limit" name="limit" defaultValue={limit} className="rounded border px-2 py-2" />
+            <label className="text-xs text-gray-600" htmlFor="limit">
+              Limit
+            </label>
+            <input
+              id="limit"
+              name="limit"
+              defaultValue={limit}
+              className="rounded border px-2 py-2"
+            />
           </div>
-          <div>
-            <button className="w-full rounded bg-black px-4 py-2 text-white" type="submit">Apply</button>
+          <div className="flex gap-2">
+            <button className="w-full rounded bg-black px-4 py-2 text-white" type="submit">
+              Apply
+            </button>
+            <a
+              href="/sms"
+              className="w-full rounded border px-4 py-2 text-center text-sm"
+            >
+              Clear
+            </a>
           </div>
         </form>
       </div>
@@ -173,26 +250,38 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
               const errTip = explainTwilioError(e.error_code);
               return (
                 <tr key={e.id} className="border-t align-top">
-                  <td className="p-3 whitespace-nowrap">{new Date(e.created_at).toLocaleString()}</td>
+                  <td className="p-3 whitespace-nowrap">
+                    {new Date(e.created_at).toLocaleString()}
+                  </td>
                   <td className="p-3 font-mono">{e.message_sid || "—"}</td>
                   <td className="p-3">{e.to_number || "—"}</td>
                   <td className="p-3">{e.from_number || "—"}</td>
-                  <td className="p-3"><StatusBadge status={e.message_status} /></td>
+                  <td className="p-3">
+                    <StatusBadge status={e.message_status} />
+                  </td>
                   <td className="p-3">
                     {e.error_code ? (
                       <div className="space-y-0.5">
                         <div className="font-mono text-xs">Code {e.error_code}</div>
-                        {errTip ? <div className="text-xs text-gray-600">{errTip}</div> : null}
-                        {e.error_message ? <div className="text-xs text-gray-600">{e.error_message}</div> : null}
+                        {errTip ? (
+                          <div className="text-xs text-gray-600">{errTip}</div>
+                        ) : null}
+                        {e.error_message ? (
+                          <div className="text-xs text-gray-600">{e.error_message}</div>
+                        ) : null}
                       </div>
-                    ) : "—"}
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 </tr>
               );
             })}
             {events.length === 0 ? (
               <tr>
-                <td className="p-4 text-center text-gray-500" colSpan={6}>No events found.</td>
+                <td className="p-4 text-center text-gray-500" colSpan={6}>
+                  No events found.
+                </td>
               </tr>
             ) : null}
           </tbody>
