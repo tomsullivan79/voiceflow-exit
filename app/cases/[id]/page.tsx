@@ -8,7 +8,7 @@ import Link from "next/link";
 // ===== Supabase admin client =====
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE!;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE!; // your env name
   if (!url || !serviceKey) throw new Error("Missing Supabase env vars.");
   return createClient(url, serviceKey, { auth: { persistSession: false } });
 }
@@ -19,12 +19,11 @@ const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID!;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN!;
 const TWILIO_MESSAGING_SERVICE_SID = process.env.TWILIO_MESSAGING_SERVICE_SID!;
 
-// ===== Types (adjust if your schema differs) =====
+// ===== Types =====
 type Conversation = {
   id: string;
   title?: string | null;
-  /** E.164 recipient number (human). Change if your column is named differently. */
-  participant_phone?: string | null;
+  participant_phone?: string | null; // adjust if your column differs
 };
 
 type ConversationMessage = {
@@ -45,7 +44,6 @@ async function getConversationAndMessages(conversationId: string) {
     .select("*")
     .eq("id", conversationId)
     .single();
-
   if (convoErr || !convo) throw new Error("Conversation not found");
 
   const { data: messages, error: msgErr } = await supabase
@@ -53,7 +51,6 @@ async function getConversationAndMessages(conversationId: string) {
     .select("*")
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true });
-
   if (msgErr) throw msgErr;
 
   return {
@@ -70,7 +67,6 @@ async function getLatestStatusesFor(messageSids: string[]) {
     .from("sms_event_latest")
     .select("*")
     .in("message_sid", messageSids);
-
   if (error || !data) return new Map();
 
   const map = new Map<string, any>();
@@ -101,13 +97,12 @@ export async function sendReply(formData: FormData) {
 
   const { conversation } = await getConversationAndMessages(conversationId);
 
-  // Update this line if your recipient field is different
-  const to = (conversation.participant_phone || "").trim();
+  const to = (conversation.participant_phone || "").trim(); // adjust if needed
   const initialContent = DISABLE_OUTBOUND_SMS
     ? `${body}\n\n[not sent – A2P pending]`
     : body;
 
-  // Insert assistant message first (we’ll update message_sid after sending)
+  // Insert assistant message
   const { data: inserted, error: insertErr } = await supabase
     .from("conversation_messages")
     .insert({
@@ -118,15 +113,12 @@ export async function sendReply(formData: FormData) {
     })
     .select("id")
     .single();
-
   if (insertErr || !inserted) {
     console.error("Failed to insert assistant message:", insertErr);
     redirect(`/cases/${conversationId}`);
   }
-
   const messageRowId = inserted.id as string;
 
-  // Respect A2P gate or missing number
   if (DISABLE_OUTBOUND_SMS || !to) {
     redirect(`/cases/${conversationId}`);
   }
@@ -138,7 +130,6 @@ export async function sendReply(formData: FormData) {
       to,
       body,
       messagingServiceSid: TWILIO_MESSAGING_SERVICE_SID,
-      // If your Messaging Service doesn’t already set this:
       // statusCallback: "https://app.wildtriage.org/api/sms/status",
     });
 
@@ -163,18 +154,26 @@ export async function sendReply(formData: FormData) {
 export default async function CasePage({ params }: { params: { id: string } }) {
   const { conversation, messages } = await getConversationAndMessages(params.id);
 
-  // Batch-load latest statuses via the view
+  // Batch-load statuses
   const sids = messages
     .filter((m) => m.role === "assistant" && m.message_sid)
     .map((m) => m.message_sid!) as string[];
   const statusBySid = await getLatestStatusesFor(Array.from(new Set(sids)));
 
   return (
-    <div className="mx-auto max-w-3xl p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">
-        Case: {conversation.title || conversation.id}
-      </h1>
+    <div className="mx-auto max-w-3xl p-8 space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <Link href="/cases" className="text-sm text-blue-700 underline">
+          ← Back to cases
+        </Link>
+        <h1 className="text-xl font-semibold">
+          Case: {conversation.title || conversation.id}
+        </h1>
+        <div className="w-24" />
+      </div>
 
+      {/* Messages */}
       <div className="space-y-4">
         {messages.map((message) => {
           const status =
@@ -183,35 +182,27 @@ export default async function CasePage({ params }: { params: { id: string } }) {
               : null;
 
           return (
-            <div key={message.id} className="rounded-md border p-3">
-              <div className="text-sm text-gray-500">
+            <div key={message.id} className="rounded-lg border bg-white p-4">
+              <div className="text-xs text-gray-500">
                 {message.role.toUpperCase()} •{" "}
                 {new Date(message.created_at).toLocaleString()}
               </div>
 
               <div className="mt-2 whitespace-pre-wrap">{message.content}</div>
 
-              {/* Delivery status footer for assistant messages with SID */}
               {message.role === "assistant" && message.message_sid ? (
                 <div className="mt-3 text-xs text-gray-700 border-t pt-2 space-y-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">Delivery:</span>
                     <span>{status?.message_status ?? "—"}</span>
                     <span className="text-gray-400">•</span>
-                    <span className="text-[11px] text-gray-500">
-                      SID: {message.message_sid}
-                    </span>
+                    <span className="text-[11px] text-gray-500">SID: {message.message_sid}</span>
                     <span className="text-gray-400">•</span>
                     <span className="text-[11px] text-gray-500">
-                      Updated: {status?.created_at
-                        ? new Date(status.created_at).toLocaleString()
-                        : "—"}
+                      Updated: {status?.created_at ? new Date(status.created_at).toLocaleString() : "—"}
                     </span>
                     <span className="text-gray-400">•</span>
-                    <Link
-                      href={`/sms/${message.message_sid}`}
-                      className="text-blue-700 underline"
-                    >
+                    <Link href={`/sms/${message.message_sid}`} className="text-blue-700 underline">
                       View history
                     </Link>
                   </div>
@@ -234,36 +225,36 @@ export default async function CasePage({ params }: { params: { id: string } }) {
         })}
       </div>
 
-      {/* Simple reply form */}
-      <form action={sendReply} className="mt-6 space-y-2">
-        <input type="hidden" name="conversationId" value={conversation.id} />
-        <textarea
-          name="body"
-          placeholder="Type your reply…"
-          className="w-full rounded-md border p-2"
-          rows={3}
-          required
-        />
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-50"
-            disabled={DISABLE_OUTBOUND_SMS}
-            title={
-              DISABLE_OUTBOUND_SMS
-                ? "Outbound SMS disabled (A2P pending)"
-                : "Send SMS"
-            }
-          >
-            {DISABLE_OUTBOUND_SMS ? "Send (disabled)" : "Send"}
-          </button>
-          {DISABLE_OUTBOUND_SMS && (
-            <span className="text-xs text-gray-600">
-              Outbound disabled — messages will be saved as “[not sent – A2P pending]”
-            </span>
-          )}
-        </div>
-      </form>
+      {/* Reply form */}
+      <div className="rounded-lg border bg-white p-4">
+        <form action={sendReply} className="space-y-3">
+          <input type="hidden" name="conversationId" value={conversation.id} />
+          <textarea
+            name="body"
+            placeholder="Type your reply…"
+            className="w-full rounded border px-3 py-2"
+            rows={3}
+            required
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="submit"
+              className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+              disabled={DISABLE_OUTBOUND_SMS}
+              title={DISABLE_OUTBOUND_SMS ? "Outbound SMS disabled (A2P pending)" : "Send SMS"}
+            >
+              {DISABLE_OUTBOUND_SMS ? "Send (disabled)" : "Send"}
+            </button>
+            {DISABLE_OUTBOUND_SMS && (
+              <span className="text-xs text-gray-600">
+                Outbound disabled — messages will be saved as “[not sent – A2P pending]”
+              </span>
+            )}
+          </div>
+        </form>
+      </div>
+
+      {/* Actions row (Close Case will be added next step after we pick an approach) */}
     </div>
   );
 }
