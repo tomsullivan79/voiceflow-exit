@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 function getEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const service = process.env.SUPABASE_SERVICE_ROLE; // your env name
+  const service = process.env.SUPABASE_SERVICE_ROLE;
   const missing: string[] = [];
   if (!url) missing.push("NEXT_PUBLIC_SUPABASE_URL");
   if (!anon) missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
@@ -19,22 +19,16 @@ function getEnv() {
   return { url, anon, service, missing };
 }
 
-function readParam(
-  sp: Record<string, string | string[] | undefined>,
-  key: string,
-  fallback = ""
-) {
+function readParam(sp: Record<string, string | string[] | undefined>, key: string, fallback = "") {
   const v = sp?.[key];
   if (Array.isArray(v)) return String(v[0] ?? fallback);
   return typeof v === "string" ? v : fallback;
 }
 
-/** Admin client (service role) for reading sms_events */
 function getAdminClient(url: string, service: string) {
   return createClient(url, service, { auth: { persistSession: false } });
 }
 
-/** Server auth gate: read cookies, but DON'T set/remove in a server component */
 async function requireSession(url: string, anon: string) {
   const cookieStore = cookies();
   const supabase = createServerClient(url, anon, {
@@ -42,12 +36,9 @@ async function requireSession(url: string, anon: string) {
       get(name: string) {
         return cookieStore.get(name)?.value;
       },
-      set() {
-        // no-op in server components
-      },
-      remove() {
-        // no-op in server components
-      },
+      // no-ops in server components (prevents “Cookies can only be modified…” error)
+      set() {},
+      remove() {},
     },
   });
   const { data } = await supabase.auth.getUser();
@@ -72,16 +63,11 @@ async function fetchEvents(url: string, service: string, sp: SearchParams) {
 
   const q = readParam(sp, "q").trim();
   const status = readParam(sp, "message_status").trim().toLowerCase();
-  const limitNum = Math.min(
-    Math.max(parseInt(readParam(sp, "limit", "200"), 10) || 200, 1),
-    1000
-  );
+  const limitNum = Math.min(Math.max(parseInt(readParam(sp, "limit", "200"), 10) || 200, 1), 1000);
 
   let query = supabase
     .from("sms_events")
-    .select(
-      "id,message_sid,to_number,from_number,message_status,error_code,error_message,created_at"
-    )
+    .select("id,message_sid,to_number,from_number,message_status,error_code,error_message,created_at")
     .order("created_at", { ascending: false })
     .limit(limitNum);
 
@@ -102,102 +88,65 @@ async function fetchEvents(url: string, service: string, sp: SearchParams) {
 }
 
 function StatusBadge({ status }: { status: string | null }) {
-  const s = (status || "").toLowerCase();
-  let cls = "inline-block rounded px-2 py-0.5 text-xs border";
-  if (s === "delivered") cls += " bg-green-50 text-green-700 border-green-200";
-  else if (s === "undelivered" || s === "failed")
-    cls += " bg-red-50 text-red-700 border-red-200";
-  else if (s === "sent" || s === "queued" || s === "accepted")
-    cls += " bg-blue-50 text-blue-700 border-blue-200";
-  else if (s === "receiving" || s === "received")
-    cls += " bg-purple-50 text-purple-700 border-purple-200";
-  else cls += " bg-gray-50 text-gray-700 border-gray-200";
-  return <span className={cls}>{status || "—"}</span>;
+  return <span>{status || "—"}</span>;
 }
 
 function explainTwilioError(code?: string | null) {
   switch (code) {
-    case "30003":
-      return "Unreachable handset (off/out of service).";
-    case "30004":
-      return "Blocked by carrier or user.";
-    case "30005":
-      return "Unknown or inactive number.";
-    case "30006":
-      return "Landline or unreachable route.";
-    case "30007":
-      return "Carrier filter (spam).";
-    case "30034":
-      return "A2P 10DLC registration/campaign issue.";
-    default:
-      return null;
+    case "30003": return "Unreachable handset (off/out of service).";
+    case "30004": return "Blocked by carrier or user.";
+    case "30005": return "Unknown or inactive number.";
+    case "30006": return "Landline or unreachable route.";
+    case "30007": return "Carrier filter (spam).";
+    case "30034": return "A2P 10DLC registration/campaign issue.";
+    default: return null;
   }
 }
 
-export default async function SmsLogPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function SmsLogPage({ searchParams }: { searchParams: SearchParams }) {
   const { url, anon, service, missing } = getEnv();
 
   if (missing.length > 0) {
     return (
-      <div className="mx-auto max-w-3xl p-8 space-y-6">
-        <h1 className="text-2xl font-semibold">SMS Delivery Log</h1>
-        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+      <main style={{ maxWidth: 1024, margin: "32px auto", padding: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 16 }}>SMS Delivery Log</h1>
+        <div style={{ padding: 12, border: "1px solid #fecaca", background: "#fef2f2" }}>
           Missing required environment variables: <b>{missing.join(", ")}</b>.
         </div>
-      </div>
+      </main>
     );
   }
 
   await requireSession(url!, anon!);
   const events = await fetchEvents(url!, service!, searchParams);
 
-  // Persist current values in the form
   const q = readParam(searchParams, "q");
   const message_status = readParam(searchParams, "message_status");
   const limit = readParam(searchParams, "limit", "200");
 
   return (
-    <div className="mx-auto max-w-6xl p-8 space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">SMS Delivery Log</h1>
-        <p className="text-sm text-gray-600">
+    <main style={{ maxWidth: 1024, margin: "32px auto", padding: 24 }}>
+      <div>
+        <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 4 }}>SMS Delivery Log</h1>
+        <p style={{ color: "#6b7280", fontSize: 14, marginBottom: 16 }}>
           Search and inspect delivery receipts from Twilio.
         </p>
       </div>
 
       {/* Filters */}
-      <div className="rounded-lg border bg-white p-4 md:p-6">
-        <form
-          method="get"
-          action="/sms"
-          className="grid grid-cols-1 gap-4 md:grid-cols-5 md:items-end"
-        >
-          <div className="flex flex-col md:col-span-2">
-            <label className="text-xs text-gray-600" htmlFor="q">
+      <div style={{ border: "1px solid #e5e7eb", background: "#fff", padding: 16, marginBottom: 16 }}>
+        <form method="get" action="/sms" style={{ display: "grid", gap: 12, gridTemplateColumns: "2fr 1fr 1fr 1fr" }}>
+          <div>
+            <label htmlFor="q" style={{ display: "block", fontSize: 12, color: "#6b7280" }}>
               Search (SID, To, From)
             </label>
-            <input
-              id="q"
-              name="q"
-              defaultValue={q}
-              className="rounded border px-2 py-2"
-              placeholder="e.g., SM..., +1555..."
-            />
+            <input id="q" name="q" defaultValue={q} placeholder="e.g., SM..., +1555..." style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 4 }} />
           </div>
-          <div className="flex flex-col">
-            <label className="text-xs text-gray-600" htmlFor="message_status">
+          <div>
+            <label htmlFor="message_status" style={{ display: "block", fontSize: 12, color: "#6b7280" }}>
               Status
             </label>
-            <select
-              id="message_status"
-              name="message_status"
-              defaultValue={message_status}
-              className="rounded border px-2 py-2"
-            >
+            <select id="message_status" name="message_status" defaultValue={message_status} style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 4 }}>
               <option value="">(any)</option>
               <option value="accepted">accepted</option>
               <option value="queued">queued</option>
@@ -210,22 +159,17 @@ export default async function SmsLogPage({
               <option value="received">received</option>
             </select>
           </div>
-          <div className="flex flex-col">
-            <label className="text-xs text-gray-600" htmlFor="limit">
+          <div>
+            <label htmlFor="limit" style={{ display: "block", fontSize: 12, color: "#6b7280" }}>
               Limit
             </label>
-            <input
-              id="limit"
-              name="limit"
-              defaultValue={limit}
-              className="rounded border px-2 py-2"
-            />
+            <input id="limit" name="limit" defaultValue={limit} style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 4 }} />
           </div>
-          <div className="flex gap-2">
-            <button className="w-full rounded bg-black px-4 py-2 text-white" type="submit">
+          <div style={{ display: "flex", gap: 8, alignItems: "end" }}>
+            <button type="submit" style={{ flex: 1, padding: "8px 12px", background: "#111827", color: "#fff", borderRadius: 4 }}>
               Apply
             </button>
-            <a href="/sms" className="w-full rounded border px-4 py-2 text-center text-sm">
+            <a href="/sms" style={{ flex: 1, padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 4, textAlign: "center", fontSize: 14 }}>
               Clear
             </a>
           </div>
@@ -233,62 +177,50 @@ export default async function SmsLogPage({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left">
+      <div style={{ overflowX: "auto", border: "1px solid #e5e7eb", background: "#fff" }}>
+        <table style={{ width: "100%", fontSize: 14, borderCollapse: "collapse" }}>
+          <thead style={{ background: "#f9fafb", textAlign: "left" }}>
             <tr>
-              <th className="p-3">Time</th>
-              <th className="p-3">SID</th>
-              <th className="p-3">To</th>
-              <th className="p-3">From</th>
-              <th className="p-3">Status</th>
-              <th className="p-3">Error</th>
+              <th style={{ padding: 12 }}>Time</th>
+              <th style={{ padding: 12 }}>SID</th>
+              <th style={{ padding: 12 }}>To</th>
+              <th style={{ padding: 12 }}>From</th>
+              <th style={{ padding: 12 }}>Status</th>
+              <th style={{ padding: 12 }}>Error</th>
             </tr>
           </thead>
           <tbody>
             {events.map((e) => {
               const errTip = explainTwilioError(e.error_code);
               return (
-                <tr key={e.id} className="border-t align-top">
-                  <td className="p-3 whitespace-nowrap">
-                    {new Date(e.created_at).toLocaleString()}
-                  </td>
-                  <td className="p-3 font-mono">{e.message_sid || "—"}</td>
-                  <td className="p-3">{e.to_number || "—"}</td>
-                  <td className="p-3">{e.from_number || "—"}</td>
-                  <td className="p-3">
-                    <StatusBadge status={e.message_status} />
-                  </td>
-                  <td className="p-3">
+                <tr key={e.id} style={{ borderTop: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                  <td style={{ padding: 12, whiteSpace: "nowrap" }}>{new Date(e.created_at).toLocaleString()}</td>
+                  <td style={{ padding: 12, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{e.message_sid || "—"}</td>
+                  <td style={{ padding: 12 }}>{e.to_number || "—"}</td>
+                  <td style={{ padding: 12 }}>{e.from_number || "—"}</td>
+                  <td style={{ padding: 12 }}><StatusBadge status={e.message_status} /></td>
+                  <td style={{ padding: 12 }}>
                     {e.error_code ? (
-                      <div className="space-y-0.5">
-                        <div className="font-mono text-xs">Code {e.error_code}</div>
-                        {errTip ? (
-                          <div className="text-xs text-gray-600">{errTip}</div>
-                        ) : null}
-                        {e.error_message ? (
-                          <div className="text-xs text-gray-600">{e.error_message}</div>
-                        ) : null}
+                      <div>
+                        <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12 }}>Code {e.error_code}</div>
+                        {errTip ? <div style={{ fontSize: 12, color: "#6b7280" }}>{errTip}</div> : null}
+                        {e.error_message ? <div style={{ fontSize: 12, color: "#6b7280" }}>{e.error_message}</div> : null}
                       </div>
-                    ) : (
-                      "—"
-                    )}
+                    ) : "—"}
                   </td>
                 </tr>
               );
             })}
             {events.length === 0 ? (
               <tr>
-                <td className="p-4 text-center text-gray-500" colSpan={6}>
-                  No events found.
-                </td>
+                <td colSpan={6} style={{ padding: 16, textAlign: "center", color: "#6b7280" }}>No events found.</td>
               </tr>
             ) : null}
           </tbody>
         </table>
       </div>
 
-      <p className="text-xs text-gray-500">Showing up to {limit} most recent events.</p>
-    </div>
+      <p style={{ color: "#6b7280", fontSize: 12 }}>Showing up to {limit} most recent events.</p>
+    </main>
   );
 }
