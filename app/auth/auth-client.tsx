@@ -37,12 +37,9 @@ export default function AuthClient() {
 
     (async () => {
       try {
-        // 1) If redirected with magic-link tokens, persist to HTTP-only cookies via our server route
         const hash = readHash();
         if (hash) {
-          if (hash.error_description) {
-            setError(hash.error_description);
-          }
+          if (hash.error_description) setError(hash.error_description);
           if (hash.access_token && hash.refresh_token) {
             const r = await fetch("/api/auth/set", {
               method: "POST",
@@ -61,10 +58,9 @@ export default function AuthClient() {
           cleanUrl();
         }
 
-        // 2) Load current user (suppress the benign “Auth session missing!” when logged out)
         const { data, error: getUserErr } = await supabase.auth.getUser();
         if (getUserErr && getUserErr.message !== "Auth session missing!") {
-          throw getUserErr; // show real errors only
+          throw getUserErr; // real error
         }
 
         if (!mounted) return;
@@ -98,9 +94,7 @@ export default function AuthClient() {
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
-        },
+        options: { emailRedirectTo: `${window.location.origin}/auth` },
       });
       if (error) throw error;
       setNotice("Magic link sent. Check your email.");
@@ -126,51 +120,95 @@ export default function AuthClient() {
     }
   }
 
-  if (loading) return <p>Loading…</p>;
+  if (loading) return <p style={{ color: "#e5e7eb" }}>Loading…</p>;
+
+  // High-contrast card styles
+  const cardStyle: React.CSSProperties = {
+    border: "1px solid #d1d5db",
+    background: "#ffffff",
+    color: "#111827",
+    borderRadius: 8,
+    padding: 16,
+  };
+  const labelStyle: React.CSSProperties = { display: "block", fontSize: 14, fontWeight: 600, color: "#111827" };
+  const inputStyle: React.CSSProperties = {
+    marginTop: 6,
+    width: "100%",
+    padding: "10px 12px",
+    border: "1px solid #6b7280",
+    borderRadius: 6,
+    color: "#111827",
+    background: "#ffffff",
+  };
+  const primaryBtn: React.CSSProperties = {
+    borderRadius: 6,
+    background: "#111827",
+    color: "#ffffff",
+    padding: "10px 14px",
+    fontWeight: 600,
+  };
+  const successBox: React.CSSProperties = {
+    border: "1px solid #34d399",
+    background: "#d1fae5",
+    color: "#065f46",
+    borderRadius: 6,
+    padding: 10,
+    fontSize: 14,
+  };
+  const errorBox: React.CSSProperties = {
+    border: "1px solid #fecaca",
+    background: "#fee2e2",
+    color: "#991b1b",
+    borderRadius: 6,
+    padding: 10,
+    fontSize: 14,
+  };
+  const infoBox: React.CSSProperties = {
+    border: "1px solid #bfdbfe",
+    background: "#eff6ff",
+    color: "#1e40af",
+    borderRadius: 6,
+    padding: 10,
+    fontSize: 14,
+  };
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      {user ? (
-        <>
-          <div style={{ border: "1px solid #86efac", background: "#f0fdf4", padding: 12, color: "#166534" }}>
-            Signed in as <span style={{ fontWeight: 600 }}>{user.email || user.id}</span>.
+      <div style={cardStyle}>
+        {user ? (
+          <div style={{ display: "grid", gap: 12 }}>
+            <div style={successBox}>
+              Signed in as <span style={{ fontWeight: 700 }}>{user.email || user.id}</span>.
+            </div>
+            <button onClick={handleSignOut} style={primaryBtn}>
+              Sign out
+            </button>
           </div>
-          <button onClick={handleSignOut} style={{ borderRadius: 6, background: "#111827", color: "#fff", padding: "8px 12px" }}>
-            Sign out
-          </button>
-        </>
-      ) : (
-        <form onSubmit={handleSendMagicLink} style={{ display: "grid", gap: 12 }}>
-          <div>
-            <label htmlFor="email" style={{ display: "block", fontSize: 14, fontWeight: 500 }}>
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="you@example.org"
-              required
-              style={{ marginTop: 6, width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 4 }}
-            />
-          </div>
-          <button type="submit" style={{ borderRadius: 6, background: "#111827", color: "#fff", padding: "8px 12px" }}>
-            Send magic link
-          </button>
-        </form>
-      )}
+        ) : (
+          <form onSubmit={handleSendMagicLink} style={{ display: "grid", gap: 12 }}>
+            <div>
+              <label htmlFor="email" style={labelStyle}>
+                Email
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="you@example.org"
+                required
+                style={inputStyle}
+              />
+            </div>
+            <button type="submit" style={primaryBtn}>
+              Send magic link
+            </button>
+          </form>
+        )}
+      </div>
 
-      {/* Only show meaningful errors; not the benign “Auth session missing!” */}
-      {error && error !== "Auth session missing!" ? (
-        <div style={{ border: "1px solid #fecaca", background: "#fef2f2", padding: 10, color: "#991b1b", fontSize: 14 }}>
-          {error}
-        </div>
-      ) : null}
-      {notice ? (
-        <div style={{ border: "1px solid #bfdbfe", background: "#eff6ff", padding: 10, color: "#1e40af", fontSize: 14 }}>
-          {notice}
-        </div>
-      ) : null}
+      {/* High-contrast notices */}
+      {error && error !== "Auth session missing!" ? <div style={errorBox}>{error}</div> : null}
+      {notice ? <div style={infoBox}>{notice}</div> : null}
     </div>
   );
 }
