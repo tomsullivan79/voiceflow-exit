@@ -6,15 +6,19 @@ import { createClient } from "@supabase/supabase-js";
 
 type UserLite = { id: string; email?: string | null };
 
-function readAndCleanHash() {
+function readHash() {
   if (typeof window === "undefined") return null;
   const raw = window.location.hash || "";
   if (!raw) return null;
   const params = new URLSearchParams(raw.replace(/^#/, ""));
   const obj = Object.fromEntries(params.entries());
-  // Clean the URL bar immediately
-  window.history.replaceState({}, "", window.location.pathname);
-  return obj;
+  return obj as Record<string, string>;
+}
+
+function cleanUrl() {
+  if (typeof window !== "undefined") {
+    window.history.replaceState({}, "", window.location.pathname);
+  }
 }
 
 export default function AuthClient() {
@@ -26,6 +30,7 @@ export default function AuthClient() {
   const supabase = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    // Browser client: detectSessionInUrl defaults to true
     return createClient(url, anon);
   }, []);
 
@@ -34,13 +39,26 @@ export default function AuthClient() {
 
     (async () => {
       try {
-        // Handle any Supabase-auth hash if present (tokens or errors)
-        const hashObj = readAndCleanHash();
-        if (hashObj?.error_description) {
-          setError(hashObj.error_description);
+        // 1) If Supabase redirected here with tokens in the hash, set the session FIRST.
+        const hash = readHash();
+        if (hash) {
+          if (hash.error_description) {
+            // e.g., otp_expired
+            setError(hash.error_description);
+          }
+          if (hash.access_token && hash.refresh_token) {
+            // Critical fix: create the session before cleaning the URL
+            const { error: setErr } = await supabase.auth.setSession({
+              access_token: hash.access_token,
+              refresh_token: hash.refresh_token,
+            });
+            if (setErr) setError(setErr.message);
+          }
+          // Clean the URL after we’ve processed any tokens/errors
+          cleanUrl();
         }
 
-        // Fetch current user (supabase-js picks up session from hash automatically)
+        // 2) Load current user
         const { data, error: getUserErr } = await supabase.auth.getUser();
         if (getUserErr) throw getUserErr;
 
@@ -48,8 +66,8 @@ export default function AuthClient() {
         const u = data.user ? { id: data.user.id, email: data.user.email } : null;
         setUser(u);
 
-        // If we’re on /auth and already signed in, bounce to /
-        if (typeof window !== "undefined" && u && window.location.pathname === "/auth") {
+        // 3) If signed in and we’re on /auth, bounce to /
+        if (u && typeof window !== "undefined" && window.location.pathname === "/auth") {
           window.location.replace("/");
           return;
         }
@@ -83,8 +101,7 @@ export default function AuthClient() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          // IMPORTANT: redirect back to /auth so we can parse & clean the hash,
-          // then we immediately send the user to / with a clean URL.
+          // Redirect back to /auth, where we set the session & clean the URL, then go to /
           emailRedirectTo: `${window.location.origin}/auth`,
         },
       });
@@ -110,7 +127,7 @@ export default function AuthClient() {
   if (loading) return <p>Loading…</p>;
 
   if (user) {
-    // While we auto-redirect to / above, this is a safe fallback.
+    // Fallback UI if you hit /auth while already signed in (briefly visible before redirect)
     return (
       <div className="space-y-4">
         <div className="rounded border border-green-300 bg-green-50 p-3 text-green-800">
