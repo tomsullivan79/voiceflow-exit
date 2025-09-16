@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import twilio from "twilio";
+import Link from "next/link";
 
 // ===== Supabase admin client =====
 function getAdminClient() {
@@ -61,27 +62,6 @@ async function getConversationAndMessages(conversationId: string) {
   };
 }
 
-async function getLatestSmsStatus(messageSid: string) {
-  if (!messageSid) return null;
-  const supabase = getAdminClient();
-  const { data, error } = await supabase
-    .from("sms_events")
-    .select("*")
-    .eq("message_sid", messageSid)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) return null;
-  return data as
-    | {
-        message_status: string | null;
-        error_code: string | null;
-        error_message: string | null;
-        created_at: string;
-      }
-    | null;
-}
-
 async function getLatestStatusesFor(messageSids: string[]) {
   if (messageSids.length === 0) return new Map<string, any>();
   const supabase = getAdminClient();
@@ -94,10 +74,20 @@ async function getLatestStatusesFor(messageSids: string[]) {
   if (error || !data) return new Map();
 
   const map = new Map<string, any>();
-  for (const row of data) {
-    map.set(row.message_sid, row);
-  }
+  for (const row of data) map.set(row.message_sid, row);
   return map;
+}
+
+function explainTwilioError(code?: string | null) {
+  switch (code) {
+    case "30003": return "Unreachable destination handset (power off/out of service).";
+    case "30004": return "Message blocked by carrier or user’s settings.";
+    case "30005": return "Unknown or inactive destination number.";
+    case "30006": return "Landline or unreachable carrier route.";
+    case "30007": return "Carrier filter: message flagged as spam.";
+    case "30034": return "A2P 10DLC issue (registration/brand/campaign/number mismatch).";
+    default: return null;
+  }
 }
 
 // ===== Server action: sendReply =====
@@ -169,29 +159,14 @@ export async function sendReply(formData: FormData) {
   redirect(`/cases/${conversationId}`);
 }
 
-// --- Twilio error explainer (place above export default) ---
-function explainTwilioError(code?: string | null) {
-  switch (code) {
-    case "30003": return "Unreachable destination handset (power off/out of service).";
-    case "30004": return "Message blocked by carrier or user’s settings.";
-    case "30005": return "Unknown or inactive destination number.";
-    case "30006": return "Landline or unreachable carrier route.";
-    case "30007": return "Carrier filter: message flagged as spam.";
-    case "30034": return "A2P 10DLC issue (registration/brand/campaign/number mismatch).";
-    default: return null;
-  }
-}
-
-
 // ===== Page (server component) =====
 export default async function CasePage({ params }: { params: { id: string } }) {
   const { conversation, messages } = await getConversationAndMessages(params.id);
 
-  // Collect all assistant SIDs and batch-load latest statuses via the view
+  // Batch-load latest statuses via the view
   const sids = messages
     .filter((m) => m.role === "assistant" && m.message_sid)
     .map((m) => m.message_sid!) as string[];
-
   const statusBySid = await getLatestStatusesFor(Array.from(new Set(sids)));
 
   return (
@@ -218,11 +193,29 @@ export default async function CasePage({ params }: { params: { id: string } }) {
 
               {/* Delivery status footer for assistant messages with SID */}
               {message.role === "assistant" && message.message_sid ? (
-                <div className="mt-3 text-xs text-gray-600 border-t pt-2">
-                  <div>
-                    <span className="font-medium">Delivery:</span>{" "}
-                    {status?.message_status ?? "—"}
+                <div className="mt-3 text-xs text-gray-700 border-t pt-2 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Delivery:</span>
+                    <span>{status?.message_status ?? "—"}</span>
+                    <span className="text-gray-400">•</span>
+                    <span className="text-[11px] text-gray-500">
+                      SID: {message.message_sid}
+                    </span>
+                    <span className="text-gray-400">•</span>
+                    <span className="text-[11px] text-gray-500">
+                      Updated: {status?.created_at
+                        ? new Date(status.created_at).toLocaleString()
+                        : "—"}
+                    </span>
+                    <span className="text-gray-400">•</span>
+                    <Link
+                      href={`/sms/${message.message_sid}`}
+                      className="text-blue-700 underline"
+                    >
+                      View history
+                    </Link>
                   </div>
+
                   {status?.error_code ? (
                     <div>
                       <span className="font-medium">ErrorCode:</span>{" "}
@@ -234,13 +227,6 @@ export default async function CasePage({ params }: { params: { id: string } }) {
                       {status?.error_message ? ` — ${status.error_message}` : ""}
                     </div>
                   ) : null}
-
-                  <div className="text-[11px] text-gray-500">
-                    SID: {message.message_sid} • Updated:{" "}
-                    {status?.created_at
-                      ? new Date(status.created_at).toLocaleString()
-                      : "—"}
-                  </div>
                 </div>
               ) : null}
             </div>
