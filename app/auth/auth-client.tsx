@@ -37,12 +37,12 @@ export default function AuthClient() {
 
     (async () => {
       try {
+        // 1) If redirected with magic-link tokens, persist to HTTP-only cookies via our server route
         const hash = readHash();
         if (hash) {
-          // Show inline error if Supabase appended one
-          if (hash.error_description) setError(hash.error_description);
-
-          // Persist to HTTP-only cookies via our server route
+          if (hash.error_description) {
+            setError(hash.error_description);
+          }
           if (hash.access_token && hash.refresh_token) {
             const r = await fetch("/api/auth/set", {
               method: "POST",
@@ -61,11 +61,14 @@ export default function AuthClient() {
           cleanUrl();
         }
 
+        // 2) Load current user (suppress the benign “Auth session missing!” when logged out)
         const { data, error: getUserErr } = await supabase.auth.getUser();
-        if (getUserErr) throw getUserErr;
+        if (getUserErr && getUserErr.message !== "Auth session missing!") {
+          throw getUserErr; // show real errors only
+        }
 
         if (!mounted) return;
-        setUser(data.user ? { id: data.user.id, email: data.user.email } : null);
+        setUser(data?.user ? { id: data.user.id, email: data.user.email } : null);
       } catch (e: any) {
         if (!mounted) return;
         setError(e?.message || "Failed to load session");
@@ -96,7 +99,6 @@ export default function AuthClient() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          // Redirect back to /auth to finalize cookies server-side
           emailRedirectTo: `${window.location.origin}/auth`,
         },
       });
@@ -113,7 +115,6 @@ export default function AuthClient() {
     setError(null);
     try {
       await supabase.auth.signOut();
-      // Best-effort clear cookies on server as well
       await fetch("/api/auth/set", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -128,20 +129,20 @@ export default function AuthClient() {
   if (loading) return <p>Loading…</p>;
 
   return (
-    <div className="space-y-4">
+    <div style={{ display: "grid", gap: 16 }}>
       {user ? (
         <>
-          <div className="rounded border border-green-300 bg-green-50 p-3 text-green-800">
-            Signed in as <span className="font-medium">{user.email || user.id}</span>.
+          <div style={{ border: "1px solid #86efac", background: "#f0fdf4", padding: 12, color: "#166534" }}>
+            Signed in as <span style={{ fontWeight: 600 }}>{user.email || user.id}</span>.
           </div>
-          <button onClick={handleSignOut} className="rounded bg-black px-4 py-2 text-white">
+          <button onClick={handleSignOut} style={{ borderRadius: 6, background: "#111827", color: "#fff", padding: "8px 12px" }}>
             Sign out
           </button>
         </>
       ) : (
-        <form onSubmit={handleSendMagicLink} className="space-y-4">
+        <form onSubmit={handleSendMagicLink} style={{ display: "grid", gap: 12 }}>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium">
+            <label htmlFor="email" style={{ display: "block", fontSize: 14, fontWeight: 500 }}>
               Email
             </label>
             <input
@@ -149,26 +150,25 @@ export default function AuthClient() {
               name="email"
               type="email"
               placeholder="you@example.org"
-              className="mt-1 w-full rounded border px-3 py-2"
               required
+              style={{ marginTop: 6, width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 4 }}
             />
           </div>
-          <button type="submit" className="rounded bg-black px-4 py-2 text-white">
+          <button type="submit" style={{ borderRadius: 6, background: "#111827", color: "#fff", padding: "8px 12px" }}>
             Send magic link
           </button>
         </form>
       )}
 
-      {notice ? (
-        <div className="rounded border border-blue-300 bg-blue-50 p-2 text-sm text-blue-800">
-          {notice}
+      {/* Only show meaningful errors; not the benign “Auth session missing!” */}
+      {error && error !== "Auth session missing!" ? (
+        <div style={{ border: "1px solid #fecaca", background: "#fef2f2", padding: 10, color: "#991b1b", fontSize: 14 }}>
+          {error}
         </div>
       ) : null}
-
-      {/* Only show actionable errors; never render any legacy static string */}
-      {error ? (
-        <div className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-700">
-          {error}
+      {notice ? (
+        <div style={{ border: "1px solid #bfdbfe", background: "#eff6ff", padding: 10, color: "#1e40af", fontSize: 14 }}>
+          {notice}
         </div>
       ) : null}
     </div>
