@@ -19,7 +19,6 @@ function getEnv() {
   return { url, anon, service, missing };
 }
 
-/** Robustly read a search param that might be string | string[] | undefined */
 function readParam(
   sp: Record<string, string | string[] | undefined>,
   key: string,
@@ -72,7 +71,7 @@ async function fetchEvents(url: string, service: string, sp: SearchParams) {
   const supabase = getAdminClient(url, service);
 
   const q = readParam(sp, "q").trim();
-  const status = readParam(sp, "status").trim().toLowerCase();
+  const status = readParam(sp, "message_status").trim().toLowerCase();
   const limitNum = Math.min(
     Math.max(parseInt(readParam(sp, "limit", "200"), 10) || 200, 1),
     1000
@@ -158,7 +157,7 @@ export default async function SmsLogPage({
 
   // Persist current values in the form
   const q = readParam(searchParams, "q");
-  const status = readParam(searchParams, "status");
+  const message_status = readParam(searchParams, "message_status");
   const limit = readParam(searchParams, "limit", "200");
 
   return (
@@ -172,7 +171,11 @@ export default async function SmsLogPage({
 
       {/* Filters */}
       <div className="rounded-lg border bg-white p-4 md:p-6">
-        <form method="get" className="grid grid-cols-1 gap-4 md:grid-cols-5 md:items-end">
+        <form
+          method="get"
+          action="/sms"
+          className="grid grid-cols-1 gap-4 md:grid-cols-5 md:items-end"
+        >
           <div className="flex flex-col md:col-span-2">
             <label className="text-xs text-gray-600" htmlFor="q">
               Search (SID, To, From)
@@ -186,13 +189,13 @@ export default async function SmsLogPage({
             />
           </div>
           <div className="flex flex-col">
-            <label className="text-xs text-gray-600" htmlFor="status">
+            <label className="text-xs text-gray-600" htmlFor="message_status">
               Status
             </label>
             <select
-              id="status"
-              name="status"
-              defaultValue={status}
+              id="message_status"
+              name="message_status"
+              defaultValue={message_status}
               className="rounded border px-2 py-2"
             >
               <option value="">(any)</option>
@@ -222,10 +225,7 @@ export default async function SmsLogPage({
             <button className="w-full rounded bg-black px-4 py-2 text-white" type="submit">
               Apply
             </button>
-            <a
-              href="/sms"
-              className="w-full rounded border px-4 py-2 text-center text-sm"
-            >
+            <a href="/sms" className="w-full rounded border px-4 py-2 text-center text-sm">
               Clear
             </a>
           </div>
