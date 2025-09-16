@@ -14,7 +14,8 @@
     "next": "15.5.3",
     "openai": "^5.20.2",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "twilio": "^5.9.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
