@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { createServerClient } from "@supabase/ssr";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,15 +19,26 @@ function getEnv() {
   return { url, anon, service, missing };
 }
 
+/** Admin client (service role) for reading sms_events */
 function getAdminClient(url: string, service: string) {
   return createClient(url, service, { auth: { persistSession: false } });
 }
 
+/** Auth gate that can actually read HTTP-only cookies on the server */
 async function requireSession(url: string, anon: string) {
   const cookieStore = cookies();
-  const supabase = createClient(url, anon, {
-    auth: { persistSession: false, detectSessionInUrl: false },
-    global: { headers: { Cookie: cookieStore.toString() } },
+  const supabase = createServerClient(url, anon, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value;
+      },
+      set(name: string, value: string, options: any) {
+        cookieStore.set({ name, value, ...options });
+      },
+      remove(name: string, options: any) {
+        cookieStore.set({ name, value: "", ...options });
+      },
+    },
   });
   const { data } = await supabase.auth.getUser();
   if (!data?.user) redirect("/auth");
