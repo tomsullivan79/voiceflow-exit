@@ -82,6 +82,24 @@ async function getLatestSmsStatus(messageSid: string) {
     | null;
 }
 
+async function getLatestStatusesFor(messageSids: string[]) {
+  if (messageSids.length === 0) return new Map<string, any>();
+  const supabase = getAdminClient();
+
+  const { data, error } = await supabase
+    .from("sms_event_latest")
+    .select("*")
+    .in("message_sid", messageSids);
+
+  if (error || !data) return new Map();
+
+  const map = new Map<string, any>();
+  for (const row of data) {
+    map.set(row.message_sid, row);
+  }
+  return map;
+}
+
 // ===== Server action: sendReply =====
 export async function sendReply(formData: FormData) {
   "use server";
@@ -151,17 +169,30 @@ export async function sendReply(formData: FormData) {
   redirect(`/cases/${conversationId}`);
 }
 
+// --- Twilio error explainer (place above export default) ---
+function explainTwilioError(code?: string | null) {
+  switch (code) {
+    case "30003": return "Unreachable destination handset (power off/out of service).";
+    case "30004": return "Message blocked by carrier or user’s settings.";
+    case "30005": return "Unknown or inactive destination number.";
+    case "30006": return "Landline or unreachable carrier route.";
+    case "30007": return "Carrier filter: message flagged as spam.";
+    case "30034": return "A2P 10DLC issue (registration/brand/campaign/number mismatch).";
+    default: return null;
+  }
+}
+
+
 // ===== Page (server component) =====
 export default async function CasePage({ params }: { params: { id: string } }) {
   const { conversation, messages } = await getConversationAndMessages(params.id);
 
-  // Preload latest status for assistant messages with SID (SSR)
-  const statusBySid = new Map<string, Awaited<ReturnType<typeof getLatestSmsStatus>>>();
-  for (const m of messages) {
-    if (m.role === "assistant" && m.message_sid && !statusBySid.has(m.message_sid)) {
-      statusBySid.set(m.message_sid, await getLatestSmsStatus(m.message_sid));
-    }
-  }
+  // Collect all assistant SIDs and batch-load latest statuses via the view
+  const sids = messages
+    .filter((m) => m.role === "assistant" && m.message_sid)
+    .map((m) => m.message_sid!) as string[];
+
+  const statusBySid = await getLatestStatusesFor(Array.from(new Set(sids)));
 
   return (
     <div className="mx-auto max-w-3xl p-6 space-y-6">
@@ -182,8 +213,10 @@ export default async function CasePage({ params }: { params: { id: string } }) {
                 {message.role.toUpperCase()} •{" "}
                 {new Date(message.created_at).toLocaleString()}
               </div>
+
               <div className="mt-2 whitespace-pre-wrap">{message.content}</div>
 
+              {/* Delivery status footer for assistant messages with SID */}
               {message.role === "assistant" && message.message_sid ? (
                 <div className="mt-3 text-xs text-gray-600 border-t pt-2">
                   <div>
@@ -194,9 +227,14 @@ export default async function CasePage({ params }: { params: { id: string } }) {
                     <div>
                       <span className="font-medium">ErrorCode:</span>{" "}
                       {status.error_code}
-                      {status.error_message ? ` — ${status.error_message}` : ""}
+                      {(() => {
+                        const tip = explainTwilioError(status.error_code);
+                        return tip ? <span> — {tip}</span> : null;
+                      })()}
+                      {status?.error_message ? ` — ${status.error_message}` : ""}
                     </div>
                   ) : null}
+
                   <div className="text-[11px] text-gray-500">
                     SID: {message.message_sid} • Updated:{" "}
                     {status?.created_at
@@ -210,6 +248,7 @@ export default async function CasePage({ params }: { params: { id: string } }) {
         })}
       </div>
 
+      {/* Simple reply form */}
       <form action={sendReply} className="mt-6 space-y-2">
         <input type="hidden" name="conversationId" value={conversation.id} />
         <textarea
