@@ -1,58 +1,163 @@
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
+// app/cases/page.tsx
+import "server-only";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+function getEnv() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const service = process.env.SUPABASE_SERVICE_ROLE;
+  if (!url || !anon || !service) throw new Error("Missing Supabase env vars.");
+  return { url, anon, service };
+}
+
+async function requireSession(url: string, anon: string) {
+  const cookieStore = cookies();
+  const supabase = createServerClient(url, anon, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value;
+      },
+      // no-ops to avoid Next “Cookies can only be modified…” error
+      set() {},
+      remove() {},
+    },
+  });
+  const { data } = await supabase.auth.getUser();
+  if (!data?.user) redirect("/auth");
+}
+
+function getAdminClient(url: string, service: string) {
+  return createClient(url, service, { auth: { persistSession: false } });
+}
+
+type Conversation = {
+  id: string;
+  title: string | null;
+  participant_phone: string | null;
+  created_at: string;
+  closed_at: string | null;
+};
+
+async function fetchConversations(url: string, service: string) {
+  const supabase = getAdminClient(url, service);
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("id,title,participant_phone,created_at,closed_at")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []) as Conversation[];
+}
+
+function StatusBadge({ closed_at }: { closed_at: string | null }) {
+  const isClosed = !!closed_at;
+  const bg = isClosed ? "#fee2e2" : "#d1fae5";
+  const fg = isClosed ? "#991b1b" : "#065f46";
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "2px 8px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 700,
+        background: bg,
+        color: fg,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {isClosed ? "Closed" : "Open"}
+    </span>
+  );
+}
 
 export default async function CasesPage() {
-  // 🔐 require login
-  const sbAuth = await supabaseServerAuth();
-  const { data: { user } } = await sbAuth.auth.getUser();
-  if (!user) redirect("/auth");
+  const { url, anon, service } = getEnv();
+  await requireSession(url, anon);
+  const cases = await fetchConversations(url, service);
 
-  const sb = supabaseAdmin();
-  const { data, error } = await sb
-    .from("conversations")
-    .select("id, title, phone, status, created_at")
-    .eq("channel", "sms")
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  if (error) {
-    return (
-      <main style={{maxWidth:820, margin:"40px auto", padding:16}}>
-        <h1>Cases</h1>
-        <p style={{color:"tomato"}}>Error: {error.message}</p>
-      </main>
-    );
-  }
+  // palette
+  const pageTitle = "#f9fafb";
+  const pageSub = "#cbd5e1";
+  const cardText = "#111827";
+  const subtle = "#6b7280";
+  const border = "#d1d5db";
 
   return (
-    <main style={{maxWidth:820, margin:"40px auto", padding:16}}>
-      <h1>Cases (SMS)</h1>
-      <ul style={{listStyle:"none", padding:0}}>
-        {(data || []).map((c: any) => (
-          <li key={c.id} style={{padding:"12px 0", borderBottom:"1px solid #eee"}}>
-            <div style={{display:"flex", justifyContent:"space-between", gap:12}}>
-              <div>
-                <Link href={`/cases/${c.id}`} style={{fontWeight:600}}>
-                  {c.title || c.id}
-                </Link>
-                <div style={{opacity:0.8, fontSize:14}}>
-                  {c.phone} · {c.status} · {new Date(c.created_at).toLocaleString()}
-                </div>
-              </div>
-              <div>
-                <Link href={`/cases/${c.id}`}>Open</Link>
-              </div>
+    <main style={{ maxWidth: 900, margin: "32px auto", padding: 24 }}>
+      <h1 style={{ fontSize: 32, fontWeight: 800, color: pageTitle, marginBottom: 4 }}>
+        Cases (SMS)
+      </h1>
+      <p style={{ color: pageSub, marginBottom: 16 }}>
+        Click a case to view messages and delivery status.
+      </p>
+
+      <div style={{ display: "grid", gap: 12 }}>
+        {cases.map((c) => (
+          <div
+            key={c.id}
+            style={{
+              border: `1px solid ${border}`,
+              background: "#ffffff",
+              color: cardText,
+              borderRadius: 8,
+              padding: 14,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <Link
+                href={`/cases/${c.id}`}
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: "#1e40af",
+                  textDecoration: "underline",
+                }}
+              >
+                {c.title || c.id}
+              </Link>
+              <StatusBadge closed_at={c.closed_at} />
             </div>
-          </li>
+
+            <div style={{ marginTop: 6, color: subtle, fontSize: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span>{c.participant_phone || "—"}</span>
+              <span>•</span>
+              <span>
+                {c.closed_at ? "closed" : "open"} •{" "}
+                {new Date(c.created_at).toLocaleString()}
+              </span>
+            </div>
+          </div>
         ))}
-      </ul>
-      {(!data || data.length === 0) && (
-        <p style={{opacity:0.8, marginTop:12}}>No cases yet. Text your Twilio number to create one.</p>
-      )}
+
+        {cases.length === 0 ? (
+          <div
+            style={{
+              border: `1px solid ${border}`,
+              background: "#ffffff",
+              color: subtle,
+              borderRadius: 8,
+              padding: 16,
+              textAlign: "center",
+            }}
+          >
+            No cases yet.
+          </div>
+        ) : null}
+      </div>
     </main>
   );
 }
