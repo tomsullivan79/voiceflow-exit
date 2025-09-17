@@ -5,6 +5,27 @@ import { redirect } from "next/navigation";
 import twilio from "twilio";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+// Central Time formatter (SSR-safe)
+const ctFmt = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Chicago",
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+  timeZoneName: "short", // CST/CDT
+});
+function fmtCT(iso?: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return ctFmt.format(d);
+}
+
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE!;
@@ -25,7 +46,7 @@ type Conversation = {
 };
 
 type ConversationMessage = {
-  id: string;
+  id: string | number;
   conversation_id: string;
   role: "user" | "assistant" | "system";
   content: string;
@@ -142,8 +163,8 @@ export async function sendReply(formData: FormData) {
     .select("id")
     .single();
 
-  const messageRowId = inserted?.id as string | undefined;
-  if (!messageRowId) return redirect(`/cases/${conversationId}`);
+  const messageRowId = inserted?.id as string | number | undefined;
+  if (messageRowId == null) return redirect(`/cases/${conversationId}`);
 
   if (isClosed || DISABLE_OUTBOUND_SMS || !to) return redirect(`/cases/${conversationId}`);
 
@@ -229,11 +250,11 @@ export default async function CasePage({ params }: { params: { id: string } }) {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb", textAlign: "center", flex: 1 }}>
           Case: {conversation.title || conversation.id}
         </h1>
-        <div style={{ width: 220, display: "flex", justifyContent: "flex-end", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ width: 260, display: "flex", justifyContent: "flex-end", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {isClosed ? (
             <>
               <span style={{ padding: "6px 10px", borderRadius: 6, fontSize: 12, fontWeight: 700, background: "#fee2e2", color: "#991b1b", border: "1px solid #fecaca" }}>
-                Closed {conversation.closed_at ? `• ${new Date(conversation.closed_at).toLocaleString()}` : ""}
+                Closed • {fmtCT(conversation.closed_at)}
               </span>
               <form action={reopenCase}>
                 <input type="hidden" name="conversationId" value={conversation.id} />
@@ -272,7 +293,7 @@ export default async function CasePage({ params }: { params: { id: string } }) {
           return (
             <div key={message.id} style={card}>
               <div style={meta}>
-                {message.role.toUpperCase()} • {new Date(message.created_at).toLocaleString()}
+                {message.role.toUpperCase()} • {fmtCT(message.created_at)}
               </div>
 
               <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{message.content}</div>
@@ -286,7 +307,7 @@ export default async function CasePage({ params }: { params: { id: string } }) {
                     <span style={{ fontSize: 11, color: "#6b7280" }}>SID: {message.message_sid}</span>
                     <span style={{ color: "#9ca3af" }}>•</span>
                     <span style={{ fontSize: 11, color: "#6b7280" }}>
-                      Updated: {status?.created_at ? new Date(status.created_at).toLocaleString() : "—"}
+                      Updated: {fmtCT(status?.created_at)}
                     </span>
                     <span style={{ color: "#9ca3af" }}>•</span>
                     <Link href={`/sms/${message.message_sid}`} style={{ color: "#1e40af", textDecoration: "underline" }}>
