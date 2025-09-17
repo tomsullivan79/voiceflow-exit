@@ -91,11 +91,21 @@ function StatusChip({ status }: { status?: string | null }) {
   else if (s === "receiving" || s === "received") { bg = "#ede9fe"; fg = "#5b21b6"; }
 
   return (
-    <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 999, fontSize: 12, fontWeight: 700, background: bg, color: fg }}>
+    <span style={{
+      display: "inline-block",
+      padding: "2px 8px",
+      borderRadius: 999,
+      fontSize: 12,
+      fontWeight: 700,
+      background: bg,
+      color: fg,
+    }}>
       {status || "—"}
     </span>
   );
 }
+
+/* ----------------- Server actions ----------------- */
 
 export async function sendReply(formData: FormData) {
   "use server";
@@ -105,8 +115,12 @@ export async function sendReply(formData: FormData) {
   const body = String(formData.get("body") || "").trim();
   if (!conversationId || !body) return;
 
-  // If case is closed, do nothing (guardrail)
-  const { data: c } = await supabase.from("conversations").select("closed_at, participant_phone").eq("id", conversationId).single();
+  // Guard: don't send if case closed
+  const { data: c } = await supabase
+    .from("conversations")
+    .select("closed_at, participant_phone")
+    .eq("id", conversationId)
+    .single();
   if (!c) return redirect(`/cases/${conversationId}`);
   const isClosed = !!c.closed_at;
 
@@ -166,8 +180,24 @@ export async function closeCase(formData: FormData) {
     .update({ closed_at: new Date().toISOString() })
     .eq("id", conversationId);
 
-  redirect("/cases");
+  redirect(`/cases/${conversationId}`);
 }
+
+export async function reopenCase(formData: FormData) {
+  "use server";
+  const supabase = getAdminClient();
+  const conversationId = String(formData.get("conversationId") || "");
+  if (!conversationId) return;
+
+  await supabase
+    .from("conversations")
+    .update({ closed_at: null })
+    .eq("id", conversationId);
+
+  redirect(`/cases/${conversationId}`);
+}
+
+/* ----------------- Page ----------------- */
 
 export default async function CasePage({ params }: { params: { id: string } }) {
   const { conversation, messages } = await getConversationAndMessages(params.id);
@@ -199,11 +229,23 @@ export default async function CasePage({ params }: { params: { id: string } }) {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb", textAlign: "center", flex: 1 }}>
           Case: {conversation.title || conversation.id}
         </h1>
-        <div style={{ width: 160, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <div style={{ width: 220, display: "flex", justifyContent: "flex-end", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {isClosed ? (
-            <span style={{ padding: "6px 10px", borderRadius: 6, fontSize: 12, fontWeight: 700, background: "#fee2e2", color: "#991b1b", border: "1px solid #fecaca" }}>
-              Closed {conversation.closed_at ? `• ${new Date(conversation.closed_at).toLocaleString()}` : ""}
-            </span>
+            <>
+              <span style={{ padding: "6px 10px", borderRadius: 6, fontSize: 12, fontWeight: 700, background: "#fee2e2", color: "#991b1b", border: "1px solid #fecaca" }}>
+                Closed {conversation.closed_at ? `• ${new Date(conversation.closed_at).toLocaleString()}` : ""}
+              </span>
+              <form action={reopenCase}>
+                <input type="hidden" name="conversationId" value={conversation.id} />
+                <button
+                  type="submit"
+                  style={{ padding: "8px 12px", background: "#111827", color: "#fff", borderRadius: 6, fontWeight: 700 }}
+                  title="Reopen this case"
+                >
+                  Reopen case
+                </button>
+              </form>
+            </>
           ) : (
             <form action={closeCase}>
               <input type="hidden" name="conversationId" value={conversation.id} />
@@ -270,7 +312,7 @@ export default async function CasePage({ params }: { params: { id: string } }) {
       </div>
 
       {/* Reply form */}
-      <div style={{ ...card, marginTop: 16 }}>
+      <div style={{ border: "1px solid #d1d5db", background: "#ffffff", color: "#111827", borderRadius: 8, padding: 16, marginTop: 16 }}>
         <form action={sendReply} style={{ display: "grid", gap: 12 }}>
           <input type="hidden" name="conversationId" value={conversation.id} />
           <div>
