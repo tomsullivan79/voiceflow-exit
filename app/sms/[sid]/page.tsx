@@ -9,6 +9,23 @@ import Link from "next/link";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// Central Time formatter (SSR-safe)
+const ctFmt = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Chicago",
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+  timeZoneName: "short", // CST/CDT
+});
+function fmtCT(iso: string) {
+  const d = new Date(iso);
+  return ctFmt.format(d);
+}
+
 function getEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -156,7 +173,7 @@ export default async function SmsDetailPage({
           Delivery History
         </h1>
         <p style={{ color: pageSub, marginTop: 4 }}>
-          Message SID <span style={{ fontFamily: "ui-monospace, Menlo, monospace" }}>{sid}</span>
+          Message SID <span style={{ fontFamily: "ui-monospace, Menlo, monospace" }}>{sid}</span> • Times shown in Central Time
         </p>
       </div>
 
@@ -190,7 +207,7 @@ export default async function SmsDetailPage({
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           <thead style={{ background: "#e5e7eb" }}>
             <tr>
-              {["Time", "Status", "Error", "Details"].map((h) => (
+              {["Time (CT)", "Status", "Error", "Details"].map((h) => (
                 <th
                   key={h}
                   style={{
@@ -211,7 +228,7 @@ export default async function SmsDetailPage({
               return (
                 <tr key={e.id} style={{ borderTop: `1px solid ${border}`, verticalAlign: "top" }}>
                   <td style={{ padding: 12, whiteSpace: "nowrap" }}>
-                    {new Date(e.created_at).toLocaleString()}
+                    {fmtCT(e.created_at)}
                   </td>
                   <td style={{ padding: 12 }}>
                     <StatusBadge status={e.message_status} />
