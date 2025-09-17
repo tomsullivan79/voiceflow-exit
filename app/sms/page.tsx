@@ -89,10 +89,10 @@ function StatusBadge({ status }: { status: string | null }) {
   const s = (status || "").toLowerCase();
   let bg = "#e5e7eb"; // neutral
   let fg = "#111827";
-  if (s === "delivered") { bg = "#d1fae5"; fg = "#065f46"; }        // green
-  else if (s === "failed" || s === "undelivered") { bg = "#fee2e2"; fg = "#991b1b"; } // red
-  else if (s === "sent" || s === "queued" || s === "accepted") { bg = "#dbeafe"; fg = "#1e40af"; } // blue
-  else if (s === "receiving" || s === "received") { bg = "#ede9fe"; fg = "#5b21b6"; } // purple
+  if (s === "delivered") { bg = "#d1fae5"; fg = "#065f46"; }
+  else if (s === "failed" || s === "undelivered") { bg = "#fee2e2"; fg = "#991b1b"; }
+  else if (s === "sent" || s === "queued" || s === "accepted") { bg = "#dbeafe"; fg = "#1e40af"; }
+  else if (s === "receiving" || s === "received") { bg = "#ede9fe"; fg = "#5b21b6"; }
 
   return (
     <span
@@ -144,7 +144,7 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
   const message_status = readParam(searchParams, "message_status");
   const limit = readParam(searchParams, "limit", "200");
 
-  // reusable colors for high contrast inside white cards
+  // high-contrast palette
   const cardText = "#111827";
   const cardSubtle = "#4b5563";
   const border = "#d1d5db";
@@ -236,7 +236,19 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
               return (
                 <tr key={e.id} style={{ borderTop: `1px solid ${border}`, verticalAlign: "top" }}>
                   <td style={{ padding: 12, whiteSpace: "nowrap" }}>{new Date(e.created_at).toLocaleString()}</td>
-                  <td style={{ padding: 12, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{e.message_sid || "—"}</td>
+                  <td style={{ padding: 12, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                    {e.message_sid ? (
+                      <a
+                        href={`/sms/${e.message_sid}`}
+                        style={{ color: "#1e40af", textDecoration: "underline", outlineOffset: 2 }}
+                        title="Open delivery timeline"
+                      >
+                        {e.message_sid}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td style={{ padding: 12 }}>{e.to_number || "—"}</td>
                   <td style={{ padding: 12 }}>{e.from_number || "—"}</td>
                   <td style={{ padding: 12 }}><StatusBadge status={e.message_status} /></td>
@@ -246,8 +258,8 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
                         <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: "#111827" }}>
                           Code {e.error_code}
                         </div>
-                        {errTip ? <div style={{ fontSize: 12, color: cardSubtle }}>{errTip}</div> : null}
-                        {e.error_message ? <div style={{ fontSize: 12, color: cardSubtle }}>{e.error_message}</div> : null}
+                        {errTip ? <div style={{ fontSize: 12, color: "#4b5563" }}>{errTip}</div> : null}
+                        {e.error_message ? <div style={{ fontSize: 12, color: "#4b5563" }}>{e.error_message}</div> : null}
                       </div>
                     ) : "—"}
                   </td>
@@ -256,14 +268,14 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
             })}
             {events.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: 16, textAlign: "center", color: cardSubtle }}>No events found.</td>
+                <td colSpan={6} style={{ padding: 16, textAlign: "center", color: "#4b5563" }}>No events found.</td>
               </tr>
             ) : null}
           </tbody>
         </table>
       </div>
 
-      <p style={{ color: pageSub, fontSize: 12, marginTop: 8 }}>Showing up to {limit} most recent events.</p>
+      <p style={{ color: "#cbd5e1", fontSize: 12, marginTop: 8 }}>Showing up to {limit} most recent events.</p>
     </main>
   );
 }
