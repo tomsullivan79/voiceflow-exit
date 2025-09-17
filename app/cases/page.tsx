@@ -37,22 +37,16 @@ function getAdminClient(url: string, service: string) {
   return createClient(url, service, { auth: { persistSession: false } });
 }
 
-type Conversation = {
-  id: string;
-  title: string | null;
-  participant_phone: string | null;
-  created_at: string;
-  closed_at: string | null;
-};
+type ConversationRow = Record<string, any>;
 
 async function fetchConversations(url: string, service: string) {
   const supabase = getAdminClient(url, service);
   const { data, error } = await supabase
     .from("conversations")
-    .select("id,title,participant_phone,created_at,closed_at")
+    .select("*") // avoid referencing columns that may not exist
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data || []) as Conversation[];
+  return (data || []) as ConversationRow[];
 }
 
 function StatusBadge({ closed_at }: { closed_at: string | null }) {
@@ -99,49 +93,67 @@ export default async function CasesPage() {
       </p>
 
       <div style={{ display: "grid", gap: 12 }}>
-        {cases.map((c) => (
-          <div
-            key={c.id}
-            style={{
-              border: `1px solid ${border}`,
-              background: "#ffffff",
-              color: cardText,
-              borderRadius: 8,
-              padding: 14,
-            }}
-          >
+        {cases.map((c) => {
+          const phone =
+            c.participant_phone ??
+            c.phone ??
+            c.msisdn ??
+            c.from_number ??
+            c.to_number ??
+            null;
+
+          return (
             <div
+              key={c.id}
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
+                border: `1px solid ${border}`,
+                background: "#ffffff",
+                color: cardText,
+                borderRadius: 8,
+                padding: 14,
               }}
             >
-              <Link
-                href={`/cases/${c.id}`}
+              <div
                 style={{
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: "#1e40af",
-                  textDecoration: "underline",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
                 }}
               >
-                {c.title || c.id}
-              </Link>
-              <StatusBadge closed_at={c.closed_at} />
-            </div>
+                <Link
+                  href={`/cases/${c.id}`}
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: "#1e40af",
+                    textDecoration: "underline",
+                  }}
+                >
+                  {c.title || c.id}
+                </Link>
+                <StatusBadge closed_at={c.closed_at ?? null} />
+              </div>
 
-            <div style={{ marginTop: 6, color: subtle, fontSize: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <span>{c.participant_phone || "—"}</span>
-              <span>•</span>
-              <span>
-                {c.closed_at ? "closed" : "open"} •{" "}
-                {new Date(c.created_at).toLocaleString()}
-              </span>
+              <div
+                style={{
+                  marginTop: 6,
+                  color: subtle,
+                  fontSize: 14,
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span>{phone || "—"}</span>
+                <span>•</span>
+                <span>
+                  {(c.closed_at ? "closed" : "open") + " • "}{new Date(c.created_at).toLocaleString()}
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {cases.length === 0 ? (
           <div
