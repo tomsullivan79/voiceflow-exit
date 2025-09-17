@@ -21,6 +21,7 @@ type Conversation = {
   id: string;
   title?: string | null;
   participant_phone?: string | null;
+  closed_at?: string | null;
 };
 
 type ConversationMessage = {
@@ -90,15 +91,7 @@ function StatusChip({ status }: { status?: string | null }) {
   else if (s === "receiving" || s === "received") { bg = "#ede9fe"; fg = "#5b21b6"; }
 
   return (
-    <span style={{
-      display: "inline-block",
-      padding: "2px 8px",
-      borderRadius: 999,
-      fontSize: 12,
-      fontWeight: 700,
-      background: bg,
-      color: fg,
-    }}>
+    <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 999, fontSize: 12, fontWeight: 700, background: bg, color: fg }}>
       {status || "—"}
     </span>
   );
@@ -112,9 +105,12 @@ export async function sendReply(formData: FormData) {
   const body = String(formData.get("body") || "").trim();
   if (!conversationId || !body) return;
 
-  const { conversation } = await getConversationAndMessages(conversationId);
-  const to = (conversation.participant_phone || "").trim();
+  // If case is closed, do nothing (guardrail)
+  const { data: c } = await supabase.from("conversations").select("closed_at, participant_phone").eq("id", conversationId).single();
+  if (!c) return redirect(`/cases/${conversationId}`);
+  const isClosed = !!c.closed_at;
 
+  const to = (c.participant_phone || "").trim();
   const initialContent = DISABLE_OUTBOUND_SMS ? `${body}\n\n[not sent – A2P pending]` : body;
 
   const { data: inserted } = await supabase
@@ -122,7 +118,11 @@ export async function sendReply(formData: FormData) {
     .insert({
       conversation_id: conversationId,
       role: "assistant",
-      content: to ? initialContent : `${initialContent}\n\n[not sent – missing recipient number]`,
+      content: isClosed
+        ? `${initialContent}\n\n[not sent – case closed]`
+        : to
+        ? initialContent
+        : `${initialContent}\n\n[not sent – missing recipient number]`,
       message_sid: null,
     })
     .select("id")
@@ -131,7 +131,7 @@ export async function sendReply(formData: FormData) {
   const messageRowId = inserted?.id as string | undefined;
   if (!messageRowId) return redirect(`/cases/${conversationId}`);
 
-  if (DISABLE_OUTBOUND_SMS || !to) return redirect(`/cases/${conversationId}`);
+  if (isClosed || DISABLE_OUTBOUND_SMS || !to) return redirect(`/cases/${conversationId}`);
 
   try {
     const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
@@ -155,6 +155,20 @@ export async function sendReply(formData: FormData) {
   redirect(`/cases/${conversationId}`);
 }
 
+export async function closeCase(formData: FormData) {
+  "use server";
+  const supabase = getAdminClient();
+  const conversationId = String(formData.get("conversationId") || "");
+  if (!conversationId) return;
+
+  await supabase
+    .from("conversations")
+    .update({ closed_at: new Date().toISOString() })
+    .eq("id", conversationId);
+
+  redirect("/cases");
+}
+
 export default async function CasePage({ params }: { params: { id: string } }) {
   const { conversation, messages } = await getConversationAndMessages(params.id);
 
@@ -162,6 +176,8 @@ export default async function CasePage({ params }: { params: { id: string } }) {
     .filter((m) => m.role === "assistant" && m.message_sid)
     .map((m) => m.message_sid!) as string[];
   const statusBySid = await getLatestStatusesFor(Array.from(new Set(sids)));
+
+  const isClosed = !!conversation.closed_at;
 
   // shared styles (high-contrast on white cards)
   const card: React.CSSProperties = {
@@ -183,7 +199,24 @@ export default async function CasePage({ params }: { params: { id: string } }) {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb", textAlign: "center", flex: 1 }}>
           Case: {conversation.title || conversation.id}
         </h1>
-        <div style={{ width: 120 }} />
+        <div style={{ width: 160, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          {isClosed ? (
+            <span style={{ padding: "6px 10px", borderRadius: 6, fontSize: 12, fontWeight: 700, background: "#fee2e2", color: "#991b1b", border: "1px solid #fecaca" }}>
+              Closed {conversation.closed_at ? `• ${new Date(conversation.closed_at).toLocaleString()}` : ""}
+            </span>
+          ) : (
+            <form action={closeCase}>
+              <input type="hidden" name="conversationId" value={conversation.id} />
+              <button
+                type="submit"
+                style={{ padding: "8px 12px", background: "#111827", color: "#fff", borderRadius: 6, fontWeight: 700 }}
+                title="Mark this case as closed"
+              >
+                Close case
+              </button>
+            </form>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
@@ -247,31 +280,40 @@ export default async function CasePage({ params }: { params: { id: string } }) {
             <textarea
               id="reply"
               name="body"
-              placeholder="Type your reply…"
+              placeholder={isClosed ? "Case is closed — replies are disabled." : "Type your reply…"}
               rows={3}
               required
-              style={{ width: "100%", padding: "10px 12px", border: "1px solid #6b7280", borderRadius: 6, color: "#111827", background: "#fff" }}
+              disabled={isClosed}
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #6b7280", borderRadius: 6, color: "#111827", background: isClosed ? "#f3f4f6" : "#fff" }}
             />
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <button
               type="submit"
-              disabled={DISABLE_OUTBOUND_SMS}
-              title={DISABLE_OUTBOUND_SMS ? "Outbound SMS disabled (A2P pending)" : "Send SMS"}
+              disabled={isClosed || DISABLE_OUTBOUND_SMS}
+              title={
+                isClosed
+                  ? "Case is closed"
+                  : DISABLE_OUTBOUND_SMS
+                  ? "Outbound SMS disabled (A2P pending)"
+                  : "Send SMS"
+              }
               style={{
                 padding: "10px 14px",
-                background: DISABLE_OUTBOUND_SMS ? "#9ca3af" : "#111827",
+                background: isClosed || DISABLE_OUTBOUND_SMS ? "#9ca3af" : "#111827",
                 color: "#fff",
                 borderRadius: 6,
                 fontWeight: 700,
-                cursor: DISABLE_OUTBOUND_SMS ? "not-allowed" : "pointer",
+                cursor: isClosed || DISABLE_OUTBOUND_SMS ? "not-allowed" : "pointer",
               }}
             >
-              {DISABLE_OUTBOUND_SMS ? "Send (disabled)" : "Send"}
+              {isClosed ? "Send (disabled — case closed)" : DISABLE_OUTBOUND_SMS ? "Send (disabled)" : "Send"}
             </button>
-            {DISABLE_OUTBOUND_SMS && (
+            {(isClosed || DISABLE_OUTBOUND_SMS) && (
               <span style={{ fontSize: 12, color: "#6b7280" }}>
-                Outbound disabled — messages will be saved as “[not sent – A2P pending]”
+                {isClosed
+                  ? "Replies disabled because this case is closed."
+                  : "Outbound disabled — messages will be saved as “[not sent – A2P pending]”"}
               </span>
             )}
           </div>
