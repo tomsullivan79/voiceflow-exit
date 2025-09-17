@@ -8,6 +8,23 @@ import { createServerClient } from "@supabase/ssr";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// Central Time formatter (SSR-safe)
+const ctFmt = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Chicago",
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+  timeZoneName: "short", // shows CST/CDT
+});
+function fmtCT(iso: string) {
+  const d = new Date(iso);
+  return ctFmt.format(d);
+}
+
 function getEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -93,19 +110,8 @@ function StatusBadge({ status }: { status: string | null }) {
   else if (s === "failed" || s === "undelivered") { bg = "#fee2e2"; fg = "#991b1b"; }
   else if (s === "sent" || s === "queued" || s === "accepted") { bg = "#dbeafe"; fg = "#1e40af"; }
   else if (s === "receiving" || s === "received") { bg = "#ede9fe"; fg = "#5b21b6"; }
-
   return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "2px 8px",
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 600,
-        background: bg,
-        color: fg,
-      }}
-    >
+    <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: bg, color: fg }}>
       {status || "—"}
     </span>
   );
@@ -157,7 +163,7 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
       <div>
         <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4, color: pageTitle }}>SMS Delivery Log</h1>
         <p style={{ color: pageSub, fontSize: 14, marginBottom: 16 }}>
-          Search and inspect delivery receipts from Twilio.
+          Search and inspect delivery receipts from Twilio. Times shown in Central Time.
         </p>
       </div>
 
@@ -225,7 +231,7 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
         <table style={{ width: "100%", fontSize: 14, borderCollapse: "collapse", color: cardText }}>
           <thead style={{ background: headerBg, textAlign: "left", color: cardText }}>
             <tr>
-              {["Time", "SID", "To", "From", "Status", "Error"].map((h) => (
+              {["Time (CT)", "SID", "To", "From", "Status", "Error"].map((h) => (
                 <th key={h} style={{ padding: 12, fontWeight: 700, borderBottom: `1px solid ${border}` }}>{h}</th>
               ))}
             </tr>
@@ -235,7 +241,7 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
               const errTip = explainTwilioError(e.error_code);
               return (
                 <tr key={e.id} style={{ borderTop: `1px solid ${border}`, verticalAlign: "top" }}>
-                  <td style={{ padding: 12, whiteSpace: "nowrap" }}>{new Date(e.created_at).toLocaleString()}</td>
+                  <td style={{ padding: 12, whiteSpace: "nowrap" }}>{fmtCT(e.created_at)}</td>
                   <td style={{ padding: 12, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
                     {e.message_sid ? (
                       <a
@@ -258,8 +264,8 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
                         <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: "#111827" }}>
                           Code {e.error_code}
                         </div>
-                        {errTip ? <div style={{ fontSize: 12, color: "#4b5563" }}>{errTip}</div> : null}
-                        {e.error_message ? <div style={{ fontSize: 12, color: "#4b5563" }}>{e.error_message}</div> : null}
+                        {errTip ? <div style={{ fontSize: 12, color: cardSubtle }}>{errTip}</div> : null}
+                        {e.error_message ? <div style={{ fontSize: 12, color: cardSubtle }}>{e.error_message}</div> : null}
                       </div>
                     ) : "—"}
                   </td>
@@ -268,14 +274,14 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
             })}
             {events.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: 16, textAlign: "center", color: "#4b5563" }}>No events found.</td>
+                <td colSpan={6} style={{ padding: 16, textAlign: "center", color: cardSubtle }}>No events found.</td>
               </tr>
             ) : null}
           </tbody>
         </table>
       </div>
 
-      <p style={{ color: "#cbd5e1", fontSize: 12, marginTop: 8 }}>Showing up to {limit} most recent events.</p>
+      <p style={{ color: pageSub, fontSize: 12, marginTop: 8 }}>Showing up to {limit} most recent events.</p>
     </main>
   );
 }
