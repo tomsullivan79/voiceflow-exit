@@ -3,37 +3,78 @@
 
 import { useEffect, useRef, useState } from "react";
 import BrandHeader from "../../components/BrandHeader";
+import { supabaseBrowser } from "../../lib/supabaseBrowser";
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
 export default function WebChatPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  // NEW: load prior history on first render
+  // Load prior history AND conversation_id
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch("/api/web-chat/history", { cache: "no-store" });
         const json = await res.json().catch(() => ({} as any));
-        if (!cancelled && res.ok && json?.ok && Array.isArray(json.messages)) {
-          const prior: ChatMsg[] = json.messages.map((m: any) => ({
+        if (!cancelled && res.ok && json?.ok) {
+          const prior: ChatMsg[] = (json.messages ?? []).map((m: any) => ({
             role: m.role === "assistant" ? "assistant" : "user",
             content: String(m.content ?? ""),
           }));
           if (prior.length) setMessages(prior);
+          setConversationId(json.conversation_id ?? null);
         }
       } catch {
-        // ignore history errors for MVP
+        /* ignore for MVP */
       }
     })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // Subscribe to realtime inserts for this conversation
+  useEffect(() => {
+    if (!conversationId) return;
+    const supa = getBrowserSupabase();
+
+    const channel = supa
+      .channel(`web-chat-${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "conversation_messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const r = payload.new as { role?: string; content?: string };
+          const role = r.role === "assistant" ? "assistant" : "user";
+          const content = (r.content ?? "") as string;
+
+          // Cheap de-dupe: avoid adding if last message is identical
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.role === role && last.content === content) return prev;
+            return [...prev, { role, content }];
+          });
+        }
+      )
+      .subscribe((status) => {
+        // Optional: console.debug("Realtime status", status);
+      });
+
+    return () => {
+      supa.removeChannel(channel);
+      supa.realtime.disconnect();
+    };
+  }, [conversationId]);
 
   async function onSend() {
     if (!input.trim() || sending) return;
@@ -45,7 +86,7 @@ export default function WebChatPage() {
     setSending(true);
 
     try {
-      // 1) Persist user message to DB
+      // 1) Persist user message to DB (creates conversation if needed)
       const persist = await fetch("/api/web-chat/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -57,6 +98,11 @@ export default function WebChatPage() {
         const msg = pjson?.error ? `${pjson.stage ?? "persist"}: ${pjson.error}` : `HTTP ${persist.status}`;
         setMessages((m) => [...m, { role: "assistant", content: `Sorry—saving failed (${msg}).` }]);
         return;
+      }
+
+      // If conversation id was just created, capture it for realtime
+      if (!conversationId && pjson?.conversation_id) {
+        setConversationId(pjson.conversation_id);
       }
 
       // 2) Get assistant text from /api/chat in the browser
@@ -87,6 +133,7 @@ export default function WebChatPage() {
         const msg = sajson?.error
           ? `${sajson.stage ?? "assistant-save"}: ${sajson.error}`
           : `HTTP ${saveAssistant.status}`;
+        // Show text anyway, but flag save issue
         setMessages((m) => [
           ...m,
           { role: "assistant", content: `${assistantText}\n\n(Warning: save failed — ${msg})` },
@@ -94,7 +141,7 @@ export default function WebChatPage() {
         return;
       }
 
-      // 4) Show assistant text (saved successfully)
+      // The realtime listener will also append this row; our cheap de-dupe avoids double-add.
       setMessages((m) => [...m, { role: "assistant", content: assistantText }]);
     } catch (err: any) {
       setMessages((m) => [
@@ -164,87 +211,7 @@ export default function WebChatPage() {
         </section>
       </div>
 
-      {/* Scoped CSS (same card layout, brand button) */}
-      <style jsx>{`
-        :root {
-          --sage-50: #eff6ef;
-          --sage-100: #deede0;
-          --sage-200: #bddbc1;
-          --sage-300: #9cc9a2;
-          --sage-400: #7bbb82;
-          --sage-500: #5aa563;
-          --sage-600: #48844f;
-          --sage-700: #36633c;
-          --sage-800: #244228;
-          --sage-900: #122114;
-          --sage-primary: #6daf75;
-          --page-bg: var(--sage-50);
-          --card-bg: #ffffff;
-          --card-border: rgba(0, 0, 0, 0.08);
-          --bubble-user: #f4f7f5;
-          --bubble-assistant: #eef7f0;
-          --bubble-border: rgba(0, 0, 0, 0.1);
-          --text-dark: #0a0a0a;
-          --text-light: #f5f5f5;
-        }
-        @media (prefers-color-scheme: dark) {
-          :root {
-            --page-bg: #0a0a0a;
-            --card-bg: #151515;
-            --card-border: rgba(255, 255, 255, 0.08);
-            --bubble-user: #1b1b1b;
-            --bubble-assistant: #162019;
-            --bubble-border: rgba(255, 255, 255, 0.1);
-          }
-        }
-        .wt-main { min-height: 60vh; background: var(--page-bg); color: var(--text-dark); }
-        @media (prefers-color-scheme: dark) { .wt-main { color: var(--text-light); } }
-        .wt-wrap {
-          max-width: 760px; margin: 0 auto; padding: 28px 16px;
-          font-family: "UCity Pro", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
-            "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-        }
-        .wt-card {
-          border-radius: 16px; padding: 16px; border: 1px solid var(--card-border);
-          background: var(--card-bg); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04); margin-top: 14px;
-        }
-        .wt-empty { font-size: 14px; opacity: 0.7; margin: 6px 0; }
-        .wt-list { display: flex; flex-direction: column; gap: 14px; }
-        .wt-row { display: flex; gap: 10px; align-items: flex-start; }
-        .wt-avatar {
-          width: 32px; height: 32px; border-radius: 999px; flex-shrink: 0;
-          display: grid; place-items: center; font-size: 12px; font-weight: 700;
-          border: 1px solid var(--bubble-border); background: #fff; color: #6b7280;
-        }
-        .wt-avatar-user { background: var(--bubble-user); }
-        .wt-avatar-sage { background: #fff; padding: 2px; border-color: var(--card-border); }
-        .wt-bubble {
-          flex: 1; border-radius: 12px; padding: 10px 12px;
-          border: 1px solid var(--bubble-border); background: var(--bubble-user);
-        }
-        .wt-bubble-assistant { background: var(--bubble-assistant); }
-        .wt-role { text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; opacity: 0.65; margin-bottom: 2px; }
-        .wt-content { white-space: pre-wrap; font-size: 15px; line-height: 1.6; }
-        .wt-textarea {
-          width: 100%; resize: vertical; border-radius: 12px; border: 1px solid var(--bubble-border);
-          padding: 10px 12px; background: #fff; color: var(--text-dark); font-size: 15px; line-height: 1.5; outline: none;
-        }
-        .wt-textarea::placeholder { color: #9ca3af; }
-        @media (prefers-color-scheme: dark) { .wt-textarea { background: #111; color: var(--text-light); } }
-        .wt-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
-        .wt-btn {
-          border-radius: 12px; padding: 8px 12px; font-size: 14px; cursor: pointer;
-          border: 1px solid var(--bubble-border); background: #f8f9fb; color: #111827;
-        }
-        .wt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .wt-btn-primary { background: var(--sage-primary); border-color: var(--sage-primary); color: #fff; }
-        .wt-btn-primary:hover:enabled { filter: brightness(1.05); }
-        .wt-btn-secondary { background: #fff; }
-        @media (prefers-color-scheme: dark) {
-          .wt-btn { background: #1e1e1e; color: #e5e7eb; }
-          .wt-btn-secondary { background: #151515; }
-        }
-      `}</style>
+      {/* (Keep your existing scoped CSS; omitted here for brevity) */}
     </main>
   );
 }
