@@ -12,7 +12,7 @@ export default function WebChatPage() {
   const [sending, setSending] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  async function onSend() {
+    async function onSend() {
     if (!input.trim() || sending) return;
     const text = input.trim();
     const userMsg: ChatMsg = { role: "user", content: text };
@@ -21,14 +21,29 @@ export default function WebChatPage() {
     setSending(true);
 
     try {
-      // NEW: persist the user message to conversation_messages
-      await fetch("/api/web-chat/message", {
+      // Persist to DB (now with error surfacing)
+      const persist = await fetch("/api/web-chat/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: text }),
+        cache: "no-store",
       });
 
-      // Existing: get assistant text from your current /api/chat
+      const persistJson = await persist.json().catch(() => ({}));
+      if (!persist.ok || persistJson?.ok === false) {
+        const msg = persistJson?.error
+          ? `${persistJson.stage ?? "persist"}: ${persistJson.error}`
+          : `HTTP ${persist.status}`;
+        console.error("web-chat persist failed:", persistJson || msg);
+        setMessages((m) => [
+          ...m,
+          { role: "assistant", content: `Sorry—saving failed (${msg}).` },
+        ]);
+        // Don’t attempt assistant call if saving failed
+        return;
+      }
+
+      // Assistant reply (same as before)
       abortRef.current = new AbortController();
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -54,6 +69,7 @@ export default function WebChatPage() {
       abortRef.current = null;
     }
   }
+
 
   return (
     <main className="wt-main">
