@@ -129,6 +129,11 @@ export default function Home() {
         </a>
         <div style={{ height: 12 }} />
 
+        <a href="/chat" style={{ display: "inline-block" }}>
+          Chat
+        </a>
+        <div style={{ height: 12 }} />
+
 
       </section>
     </main>
