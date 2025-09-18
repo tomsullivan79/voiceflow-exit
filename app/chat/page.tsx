@@ -1,7 +1,7 @@
 // app/chat/page.tsx
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import BrandHeader from "../../components/BrandHeader";
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
@@ -11,6 +11,29 @@ export default function WebChatPage() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  // NEW: load prior history on first render
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/web-chat/history", { cache: "no-store" });
+        const json = await res.json().catch(() => ({} as any));
+        if (!cancelled && res.ok && json?.ok && Array.isArray(json.messages)) {
+          const prior: ChatMsg[] = json.messages.map((m: any) => ({
+            role: m.role === "assistant" ? "assistant" : "user",
+            content: String(m.content ?? ""),
+          }));
+          if (prior.length) setMessages(prior);
+        }
+      } catch {
+        // ignore history errors for MVP
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onSend() {
     if (!input.trim() || sending) return;
@@ -36,7 +59,7 @@ export default function WebChatPage() {
         return;
       }
 
-      // 2) Get assistant text from /api/chat in the browser (works reliably)
+      // 2) Get assistant text from /api/chat in the browser
       abortRef.current = new AbortController();
       const replyRes = await fetch("/api/chat", {
         method: "POST",
@@ -45,16 +68,14 @@ export default function WebChatPage() {
         cache: "no-store",
         signal: abortRef.current.signal,
       });
-
       if (!replyRes.ok) {
         const t = await replyRes.text();
         setMessages((m) => [...m, { role: "assistant", content: `Agent failed: ${t || replyRes.status}` }]);
         return;
       }
-
       const assistantText = (await replyRes.text()) || "(no response)";
 
-      // 3) Persist assistant message to DB (cookie→conversation)
+      // 3) Persist assistant message to DB
       const saveAssistant = await fetch("/api/web-chat/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -66,7 +87,6 @@ export default function WebChatPage() {
         const msg = sajson?.error
           ? `${sajson.stage ?? "assistant-save"}: ${sajson.error}`
           : `HTTP ${saveAssistant.status}`;
-        // Show text anyway, but flag save issue
         setMessages((m) => [
           ...m,
           { role: "assistant", content: `${assistantText}\n\n(Warning: save failed — ${msg})` },
@@ -99,7 +119,7 @@ export default function WebChatPage() {
           ) : (
             <div className="wt-list">
               {messages.map((m, i) => (
-                <div key={i} className="wt-row">
+                <div key={`${i}-${m.role}`} className="wt-row">
                   {m.role === "assistant" ? (
                     <picture>
                       <source media="(prefers-color-scheme: dark)" srcSet="/White_Sage.png" />
@@ -114,11 +134,7 @@ export default function WebChatPage() {
                   ) : (
                     <div aria-hidden className="wt-avatar wt-avatar-user">U</div>
                   )}
-                  <div
-                    className={`wt-bubble ${
-                      m.role === "assistant" ? "wt-bubble-assistant" : "wt-bubble-user"
-                    }`}
-                  >
+                  <div className={`wt-bubble ${m.role === "assistant" ? "wt-bubble-assistant" : "wt-bubble-user"}`}>
                     <div className="wt-role">{m.role}</div>
                     <div className="wt-content">{m.content}</div>
                   </div>
@@ -138,25 +154,17 @@ export default function WebChatPage() {
             className="wt-textarea"
           />
           <div className="wt-actions">
-            <button
-              onClick={() => abortRef.current?.abort()}
-              className="wt-btn wt-btn-secondary"
-              disabled={!sending}
-            >
+            <button onClick={() => abortRef.current?.abort()} className="wt-btn wt-btn-secondary" disabled={!sending}>
               Cancel
             </button>
-            <button
-              onClick={onSend}
-              className="wt-btn wt-btn-primary"
-              disabled={sending || !input.trim()}
-            >
+            <button onClick={onSend} className="wt-btn wt-btn-primary" disabled={sending || !input.trim()}>
               {sending ? "Sending…" : "Send"}
             </button>
           </div>
         </section>
       </div>
 
-      {/* Scoped CSS (same topology you okayed earlier) */}
+      {/* Scoped CSS (same card layout, brand button) */}
       <style jsx>{`
         :root {
           --sage-50: #eff6ef;
