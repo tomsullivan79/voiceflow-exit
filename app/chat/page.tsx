@@ -169,9 +169,9 @@ export default function WebChatPage() {
                 <div key={`${i}-${m.role}`} className="wt-row">
                   {m.role === "assistant" ? (
                     <picture>
-                      <source media="(prefers-color-scheme: dark)" srcSet="/White_Sage.png" />
+                      <source media="(prefers-color-scheme: dark)" srcSet="/public/White_Sage.png" />
                       <img
-                        src="/Green_Sage.png"
+                        src="/public/Green_Sage.png"
                         alt="Sage"
                         width={32}
                         height={32}
