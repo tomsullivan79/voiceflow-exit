@@ -22,31 +22,59 @@ export default function WebChatPage() {
     setSending(true);
 
     try {
-      // Single server call: saves user msg, calls agent, saves assistant, returns assistant text
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      const resp = await fetch("/api/web-chat/message", {
+      // 1) Persist user message to DB
+      const persist = await fetch("/api/web-chat/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: text }),
         cache: "no-store",
-        signal: controller.signal,
+      });
+      const pjson = await persist.json().catch(() => ({} as any));
+      if (!persist.ok || pjson?.ok === false) {
+        const msg = pjson?.error ? `${pjson.stage ?? "persist"}: ${pjson.error}` : `HTTP ${persist.status}`;
+        setMessages((m) => [...m, { role: "assistant", content: `Sorry—saving failed (${msg}).` }]);
+        return;
+      }
+
+      // 2) Get assistant text from /api/chat in the browser (works reliably)
+      abortRef.current = new AbortController();
+      const replyRes = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: text, remember: false }),
+        cache: "no-store",
+        signal: abortRef.current.signal,
       });
 
-      const json = await resp.json().catch(() => ({} as any));
+      if (!replyRes.ok) {
+        const t = await replyRes.text();
+        setMessages((m) => [...m, { role: "assistant", content: `Agent failed: ${t || replyRes.status}` }]);
+        return;
+      }
 
-      if (!resp.ok || json?.ok === false) {
-        const msg =
-          json?.error ? `${json.stage ?? "server"}: ${json.error}` : `HTTP ${resp.status}`;
+      const assistantText = (await replyRes.text()) || "(no response)";
+
+      // 3) Persist assistant message to DB (cookie→conversation)
+      const saveAssistant = await fetch("/api/web-chat/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: assistantText }),
+        cache: "no-store",
+      });
+      const sajson = await saveAssistant.json().catch(() => ({} as any));
+      if (!saveAssistant.ok || sajson?.ok === false) {
+        const msg = sajson?.error
+          ? `${sajson.stage ?? "assistant-save"}: ${sajson.error}`
+          : `HTTP ${saveAssistant.status}`;
+        // Show text anyway, but flag save issue
         setMessages((m) => [
           ...m,
-          { role: "assistant", content: `Sorry—saving or agent failed (${msg}).` },
+          { role: "assistant", content: `${assistantText}\n\n(Warning: save failed — ${msg})` },
         ]);
         return;
       }
 
-      const assistantText = (json?.assistant_text as string) || "(no response)";
+      // 4) Show assistant text (saved successfully)
       setMessages((m) => [...m, { role: "assistant", content: assistantText }]);
     } catch (err: any) {
       setMessages((m) => [
@@ -72,7 +100,6 @@ export default function WebChatPage() {
             <div className="wt-list">
               {messages.map((m, i) => (
                 <div key={i} className="wt-row">
-                  {/* Avatar (use white icon in dark mode for contrast if available) */}
                   {m.role === "assistant" ? (
                     <picture>
                       <source media="(prefers-color-scheme: dark)" srcSet="/White_Sage.png" />
@@ -87,8 +114,6 @@ export default function WebChatPage() {
                   ) : (
                     <div aria-hidden className="wt-avatar wt-avatar-user">U</div>
                   )}
-
-                  {/* Bubble */}
                   <div
                     className={`wt-bubble ${
                       m.role === "assistant" ? "wt-bubble-assistant" : "wt-bubble-user"
@@ -131,7 +156,7 @@ export default function WebChatPage() {
         </section>
       </div>
 
-      {/* Scoped CSS: centered layout, readable cards, brand primary */}
+      {/* Scoped CSS (same topology you okayed earlier) */}
       <style jsx>{`
         :root {
           --sage-50: #eff6ef;
@@ -164,160 +189,52 @@ export default function WebChatPage() {
             --bubble-border: rgba(255, 255, 255, 0.1);
           }
         }
-
-        .wt-main {
-          min-height: 60vh;
-          background: var(--page-bg);
-          color: var(--text-dark);
-        }
-        @media (prefers-color-scheme: dark) {
-          .wt-main {
-            color: var(--text-light);
-          }
-        }
-
+        .wt-main { min-height: 60vh; background: var(--page-bg); color: var(--text-dark); }
+        @media (prefers-color-scheme: dark) { .wt-main { color: var(--text-light); } }
         .wt-wrap {
-          max-width: 760px;
-          margin: 0 auto;
-          padding: 28px 16px;
+          max-width: 760px; margin: 0 auto; padding: 28px 16px;
           font-family: "UCity Pro", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
             "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
         }
-
         .wt-card {
-          border-radius: 16px;
-          padding: 16px;
-          border: 1px solid var(--card-border);
-          background: var(--card-bg);
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-          margin-top: 14px;
+          border-radius: 16px; padding: 16px; border: 1px solid var(--card-border);
+          background: var(--card-bg); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04); margin-top: 14px;
         }
-
-        .wt-empty {
-          font-size: 14px;
-          opacity: 0.7;
-          margin: 6px 0;
-        }
-
-        .wt-list {
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
-        }
-
-        .wt-row {
-          display: flex;
-          gap: 10px;
-          align-items: flex-start;
-        }
-
+        .wt-empty { font-size: 14px; opacity: 0.7; margin: 6px 0; }
+        .wt-list { display: flex; flex-direction: column; gap: 14px; }
+        .wt-row { display: flex; gap: 10px; align-items: flex-start; }
         .wt-avatar {
-          width: 32px;
-          height: 32px;
-          border-radius: 999px;
-          flex-shrink: 0;
-          display: grid;
-          place-items: center;
-          font-size: 12px;
-          font-weight: 700;
-          border: 1px solid var(--bubble-border);
-          background: #fff;
-          color: #6b7280;
+          width: 32px; height: 32px; border-radius: 999px; flex-shrink: 0;
+          display: grid; place-items: center; font-size: 12px; font-weight: 700;
+          border: 1px solid var(--bubble-border); background: #fff; color: #6b7280;
         }
-        .wt-avatar-user {
-          background: var(--bubble-user);
-        }
-        .wt-avatar-sage {
-          background: #fff;
-          padding: 2px;
-          border-color: var(--card-border);
-        }
-
+        .wt-avatar-user { background: var(--bubble-user); }
+        .wt-avatar-sage { background: #fff; padding: 2px; border-color: var(--card-border); }
         .wt-bubble {
-          flex: 1;
-          border-radius: 12px;
-          padding: 10px 12px;
-          border: 1px solid var(--bubble-border);
-          background: var(--bubble-user);
+          flex: 1; border-radius: 12px; padding: 10px 12px;
+          border: 1px solid var(--bubble-border); background: var(--bubble-user);
         }
-        .wt-bubble-assistant {
-          background: var(--bubble-assistant);
-        }
-
-        .wt-role {
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          font-size: 11px;
-          opacity: 0.65;
-          margin-bottom: 2px;
-        }
-        .wt-content {
-          white-space: pre-wrap;
-          font-size: 15px;
-          line-height: 1.6;
-        }
-
+        .wt-bubble-assistant { background: var(--bubble-assistant); }
+        .wt-role { text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; opacity: 0.65; margin-bottom: 2px; }
+        .wt-content { white-space: pre-wrap; font-size: 15px; line-height: 1.6; }
         .wt-textarea {
-          width: 100%;
-          resize: vertical;
-          border-radius: 12px;
-          border: 1px solid var(--bubble-border);
-          padding: 10px 12px;
-          background: #fff;
-          color: var(--text-dark);
-          font-size: 15px;
-          line-height: 1.5;
-          outline: none;
+          width: 100%; resize: vertical; border-radius: 12px; border: 1px solid var(--bubble-border);
+          padding: 10px 12px; background: #fff; color: var(--text-dark); font-size: 15px; line-height: 1.5; outline: none;
         }
-        .wt-textarea::placeholder {
-          color: #9ca3af;
-        }
-        @media (prefers-color-scheme: dark) {
-          .wt-textarea {
-            background: #111;
-            color: var(--text-light);
-          }
-        }
-
-        .wt-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 8px;
-          margin-top: 10px;
-        }
-
+        .wt-textarea::placeholder { color: #9ca3af; }
+        @media (prefers-color-scheme: dark) { .wt-textarea { background: #111; color: var(--text-light); } }
+        .wt-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
         .wt-btn {
-          border-radius: 12px;
-          padding: 8px 12px;
-          font-size: 14px;
-          cursor: pointer;
-          border: 1px solid var(--bubble-border);
-          background: #f8f9fb;
-          color: #111827;
+          border-radius: 12px; padding: 8px 12px; font-size: 14px; cursor: pointer;
+          border: 1px solid var(--bubble-border); background: #f8f9fb; color: #111827;
         }
-        .wt-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-        .wt-btn-primary {
-          background: var(--sage-primary);
-          border-color: var(--sage-primary);
-          color: #ffffff;
-        }
-        .wt-btn-primary:hover:enabled {
-          filter: brightness(1.05);
-        }
-        .wt-btn-secondary {
-          background: #fff;
-        }
+        .wt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .wt-btn-primary { background: var(--sage-primary); border-color: var(--sage-primary); color: #fff; }
+        .wt-btn-primary:hover:enabled { filter: brightness(1.05); }
+        .wt-btn-secondary { background: #fff; }
         @media (prefers-color-scheme: dark) {
-          .wt-btn {
-            background: #1e1e1e;
-            color: #e5e7eb;
-          }
-          .wt-btn-secondary {
-            background: #151515;
-          }
+          .wt-btn { background: #1e1e1e; color: #e5e7eb; }
+          .wt-btn-secondary { background: #151515; }
         }
       `}</style>
     </main>
