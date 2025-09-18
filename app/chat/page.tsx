@@ -57,15 +57,18 @@ export default function WebChatPage() {
             <div className="wt-list">
               {messages.map((m, i) => (
                 <div key={i} className="wt-row">
-                  {/* Avatar */}
+                  {/* Avatar: Green in light, White in dark */}
                   {m.role === "assistant" ? (
-                    <img
-                      src="/Green_Sage.png"
-                      alt="Sage"
-                      width={32}
-                      height={32}
-                      className="wt-avatar wt-avatar-sage"
-                    />
+                    <picture>
+                      <source media="(prefers-color-scheme: dark)" srcSet="/White_Sage.png" />
+                      <img
+                        src="/Green_Sage.png"
+                        alt="Sage"
+                        width={32}
+                        height={32}
+                        className="wt-avatar wt-avatar-sage"
+                      />
+                    </picture>
                   ) : (
                     <div aria-hidden className="wt-avatar wt-avatar-user">U</div>
                   )}
@@ -109,9 +112,10 @@ export default function WebChatPage() {
         </section>
       </div>
 
-      {/* Scoped CSS with strong light/dark contrast + brand primary always */}
+      {/* Scoped CSS — restore highlighted page bg, stronger card contrast, brand green button */}
       <style jsx>{`
         :root {
+          /* Voiceflow palette + brand */
           --sage-50:  #EFF6EF;
           --sage-100: #DEEDE0;
           --sage-200: #BDDBC1;
@@ -122,36 +126,47 @@ export default function WebChatPage() {
           --sage-700: #36633C;
           --sage-800: #244228;
           --sage-900: #122114;
-          --sage-primary: #6DAF75; /* brand green */
+          --sage-primary: #6DAF75;
+
           --text-dark: #0a0a0a;
           --text-light: #f5f5f5;
+
+          /* Readable page background (light tint like your old screenshot) */
+          --page-bg: linear-gradient(180deg, var(--sage-50), #ffffff);
+          --page-bg-solid: var(--sage-50);
+
+          /* Cards & bubbles */
           --card-bg: #ffffff;
-          --bubble-user: #f4f7f5;
-          --bubble-assistant: #eef7f0;
-          --bubble-border: rgba(0,0,0,0.08);
+          --card-border: rgba(0,0,0,0.08);
+          --bubble-user: #f4f7f5;       /* light gray-green */
+          --bubble-assistant: #eef7f0;  /* gentle green tint */
+          --bubble-border: rgba(0,0,0,0.10);
         }
         @media (prefers-color-scheme: dark) {
           :root {
+            --page-bg: radial-gradient(60% 60% at 50% 0%, #101010, #0a0a0a);
+            --page-bg-solid: #0a0a0a;
             --card-bg: #151515;
+            --card-border: rgba(255,255,255,0.08);
             --bubble-user: #1b1b1b;
-            --bubble-assistant: #162019; /* green-tinted dark */
-            --bubble-border: rgba(255,255,255,0.08);
+            --bubble-assistant: #162019; /* greenish tint for readability */
+            --bubble-border: rgba(255,255,255,0.10);
           }
         }
 
         .wt-main {
           min-height: 60vh;
-          background: var(--sage-50);
+          background: var(--page-bg);
           color: var(--text-dark);
         }
         @media (prefers-color-scheme: dark) {
-          .wt-main { background: #0a0a0a; color: var(--text-light); }
+          .wt-main { color: var(--text-light); }
         }
 
         .wt-wrap {
           max-width: 760px;
           margin: 0 auto;
-          padding: 24px 16px;
+          padding: 28px 16px;
           font-family: "UCity Pro", ui-sans-serif, system-ui, -apple-system, Segoe UI,
             Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
         }
@@ -159,10 +174,10 @@ export default function WebChatPage() {
         .wt-card {
           border-radius: 16px;
           padding: 16px;
-          border: 1px solid var(--bubble-border);
+          border: 1px solid var(--card-border);
           background: var(--card-bg);
-          box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-          margin-top: 12px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+          margin-top: 14px;
         }
 
         .wt-empty { font-size: 14px; opacity: 0.7; margin: 6px 0; }
@@ -178,7 +193,7 @@ export default function WebChatPage() {
           background: #fff; color: #6b7280;
         }
         .wt-avatar-user { background: var(--bubble-user); }
-        .wt-avatar-sage { background: #fff; padding: 2px; }
+        .wt-avatar-sage { background: #fff; padding: 2px; border-color: var(--card-border); }
 
         .wt-bubble {
           flex: 1;
@@ -215,7 +230,7 @@ export default function WebChatPage() {
         }
         .wt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        /* Force brand green for primary in both modes */
+        /* Always brand green for primary */
         .wt-btn-primary {
           background: var(--sage-primary) !important;
           border-color: var(--sage-primary) !important;
