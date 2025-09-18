@@ -14,23 +14,34 @@ export default function WebChatPage() {
 
   async function onSend() {
     if (!input.trim() || sending) return;
-    const userMsg: ChatMsg = { role: "user", content: input.trim() };
+    const text = input.trim();
+    const userMsg: ChatMsg = { role: "user", content: text };
     setMessages((m) => [...m, userMsg]);
     setInput("");
     setSending(true);
 
     try {
+      // NEW: persist the user message to conversation_messages
+      await fetch("/api/web-chat/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: text }),
+      });
+
+      // Existing: get assistant text from your current /api/chat
       abortRef.current = new AbortController();
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: abortRef.current.signal,
-        body: JSON.stringify({ input: userMsg.content, remember: false }),
+        body: JSON.stringify({ input: text, remember: false }),
       });
+
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `HTTP ${res.status}`);
+        const t = await res.text();
+        throw new Error(t || `HTTP ${res.status}`);
       }
+
       const reply = await res.text();
       setMessages((m) => [...m, { role: "assistant", content: reply || "(no response)" }]);
     } catch (err: any) {
@@ -56,8 +67,18 @@ export default function WebChatPage() {
             <div className="wt-list">
               {messages.map((m, i) => (
                 <div key={i} className="wt-row">
-                  <div className={`wt-dot ${m.role === "user" ? "wt-user" : "wt-assistant"}`} />
-                  <div className="wt-msg">
+                  {m.role === "assistant" ? (
+                    <img
+                      src="/Green_Sage.png"
+                      alt="Sage"
+                      width={32}
+                      height={32}
+                      className="wt-avatar wt-avatar-sage"
+                    />
+                  ) : (
+                    <div aria-hidden className="wt-avatar wt-avatar-user">U</div>
+                  )}
+                  <div className={`wt-bubble ${m.role === "assistant" ? "wt-bubble-assistant" : "wt-bubble-user"}`}>
                     <div className="wt-role">{m.role}</div>
                     <div className="wt-content">{m.content}</div>
                   </div>
@@ -76,18 +97,10 @@ export default function WebChatPage() {
             className="wt-textarea"
           />
           <div className="wt-actions">
-            <button
-              onClick={() => abortRef.current?.abort()}
-              className="wt-btn wt-btn-secondary"
-              disabled={!sending}
-            >
+            <button onClick={() => abortRef.current?.abort()} className="wt-btn wt-btn-secondary" disabled={!sending}>
               Cancel
             </button>
-            <button
-              onClick={onSend}
-              className="wt-btn wt-btn-primary"
-              disabled={sending || !input.trim()}
-            >
+            <button onClick={onSend} className="wt-btn wt-btn-primary" disabled={sending || !input.trim()}>
               {sending ? "Sending…" : "Send"}
             </button>
           </div>
