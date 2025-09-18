@@ -14,7 +14,7 @@ export default function WebChatPage() {
   const [sending, setSending] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Load prior history AND conversation_id
+  // Load prior history + conversation id
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -38,10 +38,10 @@ export default function WebChatPage() {
     };
   }, []);
 
-  // Subscribe to realtime inserts for this conversation
+  // Realtime subscribe to inserts for this conversation
   useEffect(() => {
     if (!conversationId) return;
-    const supa = getBrowserSupabase();
+    const supa = supabaseBrowser();
 
     const channel = supa
       .channel(`web-chat-${conversationId}`)
@@ -56,9 +56,8 @@ export default function WebChatPage() {
         (payload) => {
           const r = payload.new as { role?: string; content?: string };
           const role = r.role === "assistant" ? "assistant" : "user";
-          const content = (r.content ?? "") as string;
-
-          // Cheap de-dupe: avoid adding if last message is identical
+          const content = String(r.content ?? "");
+          // Cheap de-dupe: don't add identical consecutive message
           setMessages((prev) => {
             const last = prev[prev.length - 1];
             if (last && last.role === role && last.content === content) return prev;
@@ -66,13 +65,11 @@ export default function WebChatPage() {
           });
         }
       )
-      .subscribe((status) => {
-        // Optional: console.debug("Realtime status", status);
-      });
+      .subscribe();
 
     return () => {
       supa.removeChannel(channel);
-      supa.realtime.disconnect();
+      // optional: supa.realtime.disconnect(); // not necessary unless you want to fully tear down
     };
   }, [conversationId]);
 
@@ -86,7 +83,7 @@ export default function WebChatPage() {
     setSending(true);
 
     try {
-      // 1) Persist user message to DB (creates conversation if needed)
+      // 1) Persist user message (creates conversation if needed)
       const persist = await fetch("/api/web-chat/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -100,12 +97,12 @@ export default function WebChatPage() {
         return;
       }
 
-      // If conversation id was just created, capture it for realtime
+      // If the conversation was just created, keep its id for realtime
       if (!conversationId && pjson?.conversation_id) {
         setConversationId(pjson.conversation_id);
       }
 
-      // 2) Get assistant text from /api/chat in the browser
+      // 2) Get assistant text (browser call)
       abortRef.current = new AbortController();
       const replyRes = await fetch("/api/chat", {
         method: "POST",
@@ -121,7 +118,7 @@ export default function WebChatPage() {
       }
       const assistantText = (await replyRes.text()) || "(no response)";
 
-      // 3) Persist assistant message to DB
+      // 3) Persist assistant message
       const saveAssistant = await fetch("/api/web-chat/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -133,7 +130,7 @@ export default function WebChatPage() {
         const msg = sajson?.error
           ? `${sajson.stage ?? "assistant-save"}: ${sajson.error}`
           : `HTTP ${saveAssistant.status}`;
-        // Show text anyway, but flag save issue
+        // Still show the text, but flag save issue
         setMessages((m) => [
           ...m,
           { role: "assistant", content: `${assistantText}\n\n(Warning: save failed — ${msg})` },
@@ -141,7 +138,7 @@ export default function WebChatPage() {
         return;
       }
 
-      // The realtime listener will also append this row; our cheap de-dupe avoids double-add.
+      // Realtime will also deliver this; our de-dupe avoids double-append
       setMessages((m) => [...m, { role: "assistant", content: assistantText }]);
     } catch (err: any) {
       setMessages((m) => [
@@ -169,9 +166,9 @@ export default function WebChatPage() {
                 <div key={`${i}-${m.role}`} className="wt-row">
                   {m.role === "assistant" ? (
                     <picture>
-                      <source media="(prefers-color-scheme: dark)" srcSet="/public/White_Sage.png" />
+                      <source media="(prefers-color-scheme: dark)" srcSet="/White_Sage.png" />
                       <img
-                        src="/public/Green_Sage.png"
+                        src="/Green_Sage.png"
                         alt="Sage"
                         width={32}
                         height={32}
