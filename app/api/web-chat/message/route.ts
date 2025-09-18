@@ -3,13 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 
-// Force Node runtime (supabase-js + service role works best here)
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE!, // per your env naming
+  process.env.SUPABASE_SERVICE_ROLE!,
   { auth: { persistSession: false } }
 );
 
@@ -20,21 +19,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "content required" }, { status: 400 });
     }
 
+    const ownerUserId = process.env.WEB_CHAT_OWNER_USER_ID;
+    if (!ownerUserId) {
+      return NextResponse.json(
+        { ok: false, stage: "config", error: "WEB_CHAT_OWNER_USER_ID not set" },
+        { status: 500 }
+      );
+    }
+
     const jar = await cookies();
     let cookieId = jar.get("wt_web_cookie")?.value as string | undefined;
 
     if (!cookieId) {
       cookieId = crypto.randomUUID();
-      // 30-day cookie
       jar.set("wt_web_cookie", cookieId, {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        maxAge: 60 * 60 * 24 * 30,
+        maxAge: 60 * 60 * 24 * 30, // 30 days
       });
     }
 
-    // Try to find existing mapping
+    // Look up existing mapping
     let conversationId: string | null = null;
     {
       const { data, error } = await supabaseAdmin
@@ -56,7 +62,9 @@ export async function POST(req: NextRequest) {
     if (!conversationId) {
       const { data: conv, error: convErr } = await supabaseAdmin
         .from("conversations")
-        .insert({}) // assumes defaults; if your schema requires cols, we’ll adjust in next step
+        .insert({
+          user_id: ownerUserId,       // <- satisfy NOT NULL constraint
+        })
         .select("id")
         .single();
 
@@ -81,14 +89,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Insert user message
+    // Insert the user's message
     const { error: msgErr } = await supabaseAdmin
       .from("conversation_messages")
       .insert({
         conversation_id: conversationId,
         role: "user",
         content: content.trim(),
-        message_sid: null,
+        message_sid: null, // SMS-only
       });
 
     if (msgErr) {
