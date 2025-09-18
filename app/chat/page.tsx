@@ -2,6 +2,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import BrandHeader from "../../components/BrandHeader";
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
@@ -24,30 +25,18 @@ export default function WebChatPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: abortRef.current.signal,
-        body: JSON.stringify({
-          input: userMsg.content,
-          remember: false,
-        }),
+        body: JSON.stringify({ input: userMsg.content, remember: false }),
       });
-
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || `HTTP ${res.status}`);
       }
-
       const reply = await res.text();
-      const assistantMsg: ChatMsg = {
-        role: "assistant",
-        content: reply || "(no response)",
-      };
-      setMessages((m) => [...m, assistantMsg]);
+      setMessages((m) => [...m, { role: "assistant", content: reply || "(no response)" }]);
     } catch (err: any) {
       setMessages((m) => [
         ...m,
-        {
-          role: "assistant",
-          content: `Sorry—something went wrong: ${err?.message || err}`,
-        },
+        { role: "assistant", content: `Sorry—something went wrong: ${err?.message || err}` },
       ]);
     } finally {
       setSending(false);
@@ -58,12 +47,7 @@ export default function WebChatPage() {
   return (
     <main className="wt-main">
       <div className="wt-wrap">
-        <header className="wt-header">
-          <h1 className="wt-title">Wildlife Triage — Web Chat (MVP)</h1>
-          <p className="wt-sub">
-            This public chat reuses the <code>/api/chat</code> endpoint. It does not store messages yet.
-          </p>
-        </header>
+        <BrandHeader title="Sage" subtitle="Wildlife Triage Agent" imageSrc="/Green_Sage.png" />
 
         <section className="wt-card wt-transcript">
           {messages.length === 0 ? (
@@ -72,10 +56,7 @@ export default function WebChatPage() {
             <div className="wt-list">
               {messages.map((m, i) => (
                 <div key={i} className="wt-row">
-                  <div
-                    className={`wt-dot ${m.role === "user" ? "wt-user" : "wt-assistant"}`}
-                    aria-hidden
-                  />
+                  <div className={`wt-dot ${m.role === "user" ? "wt-user" : "wt-assistant"}`} />
                   <div className="wt-msg">
                     <div className="wt-role">{m.role}</div>
                     <div className="wt-content">{m.content}</div>
@@ -113,45 +94,51 @@ export default function WebChatPage() {
         </section>
       </div>
 
-      {/* Component-scoped CSS: centered, padded, dark-mode friendly */}
+      {/* Scoped CSS with your palette + primary color */}
       <style jsx>{`
+        :root {
+          --sage-50:  #EFF6EF;
+          --sage-100: #DEEDE0;
+          --sage-200: #BDDBC1;
+          --sage-300: #9CC9A2;
+          --sage-400: #7BBB82;
+          --sage-500: #5AA563;
+          --sage-600: #48844F;
+          --sage-700: #36633C;
+          --sage-800: #244228;
+          --sage-900: #122114;
+          --sage-primary: #6DAF75; /* voiceflow primary */
+          --text-dark: #0a0a0a;
+          --text-light: #f5f5f5;
+        }
+
         .wt-main {
           min-height: 60vh;
-          background: #fafafa;
-          color: #0a0a0a;
+          background: var(--sage-50);
+          color: var(--text-dark);
         }
         @media (prefers-color-scheme: dark) {
           .wt-main {
             background: #0a0a0a;
-            color: #f5f5f5;
+            color: var(--text-light);
           }
         }
+
         .wt-wrap {
           max-width: 760px;
           margin: 0 auto;
           padding: 24px 16px;
+          font-family: "UCity Pro", ui-sans-serif, system-ui, -apple-system, Segoe UI,
+            Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
         }
-        .wt-header {
-          margin-bottom: 12px;
-        }
-        .wt-title {
-          font-size: 24px;
-          line-height: 1.25;
-          font-weight: 700;
-          margin: 0;
-        }
-        .wt-sub {
-          margin: 6px 0 0 0;
-          font-size: 14px;
-          opacity: 0.8;
-        }
+
         .wt-card {
           border-radius: 16px;
           padding: 16px;
           border: 1px solid rgba(0, 0, 0, 0.08);
           background: #ffffff;
           box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-          margin-bottom: 12px;
+          margin-top: 12px;
         }
         @media (prefers-color-scheme: dark) {
           .wt-card {
@@ -160,36 +147,42 @@ export default function WebChatPage() {
             box-shadow: none;
           }
         }
+
         .wt-empty {
           font-size: 14px;
           opacity: 0.7;
           margin: 6px 0;
         }
+
         .wt-list {
           display: flex;
           flex-direction: column;
           gap: 12px;
         }
+
         .wt-row {
           display: flex;
           gap: 10px;
         }
+
         .wt-dot {
           width: 28px;
           height: 28px;
           border-radius: 999px;
           flex-shrink: 0;
-          background: #d1d5db;
+          background: var(--sage-200);
         }
         .wt-user {
-          background: #3b82f6;
+          background: var(--sage-500);
         }
         .wt-assistant {
-          background: #10b981;
+          background: var(--sage-400);
         }
+
         .wt-msg {
           flex: 1;
         }
+
         .wt-role {
           text-transform: uppercase;
           letter-spacing: 0.06em;
@@ -197,11 +190,13 @@ export default function WebChatPage() {
           opacity: 0.65;
           margin-bottom: 2px;
         }
+
         .wt-content {
           white-space: pre-wrap;
           font-size: 15px;
           line-height: 1.6;
         }
+
         .wt-textarea {
           width: 100%;
           resize: vertical;
@@ -209,7 +204,7 @@ export default function WebChatPage() {
           border: 1px solid rgba(0, 0, 0, 0.15);
           padding: 10px 12px;
           background: #fff;
-          color: #0a0a0a;
+          color: var(--text-dark);
           font-size: 15px;
           line-height: 1.5;
           outline: none;
@@ -217,12 +212,14 @@ export default function WebChatPage() {
         .wt-textarea::placeholder {
           color: #9ca3af;
         }
+
         .wt-actions {
           display: flex;
           justify-content: flex-end;
           gap: 8px;
           margin-top: 10px;
         }
+
         .wt-btn {
           border-radius: 12px;
           padding: 8px 12px;
@@ -236,21 +233,23 @@ export default function WebChatPage() {
           opacity: 0.5;
           cursor: not-allowed;
         }
+
         .wt-btn-primary {
-          background: #2563eb;
+          background: var(--sage-primary);
           color: #ffffff;
-          border-color: #2563eb;
+          border-color: var(--sage-primary);
         }
         .wt-btn-primary:hover:enabled {
           filter: brightness(1.05);
         }
+
         .wt-btn-secondary {
           background: #fff;
         }
         @media (prefers-color-scheme: dark) {
           .wt-textarea {
             background: #111;
-            color: #f5f5f5;
+            color: var(--text-light);
             border-color: rgba(255, 255, 255, 0.15);
           }
           .wt-btn {
@@ -259,8 +258,8 @@ export default function WebChatPage() {
             border-color: rgba(255, 255, 255, 0.15);
           }
           .wt-btn-primary {
-            background: #3b82f6;
-            border-color: #3b82f6;
+            background: var(--sage-500);
+            border-color: var(--sage-500);
           }
           .wt-btn-secondary {
             background: #161616;
