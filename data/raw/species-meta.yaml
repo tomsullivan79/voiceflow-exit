@@ -1,0 +1,1615 @@
+robin:
+  category: songbird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: A common songbird in Minnesota, robins are medium-sized birds with orange-red breasts, often seen hopping in yards or foraging on lawns.
+  keywords:
+    shape: [medium, rounded body]
+    color: [orange breast, brown, gray]
+    behavior: [ground foraging, sings, hops]
+    environment: [lawns, gardens, trees]
+  care_advice: >
+    Fledgling robins (fully feathered, hopping) are typically cared for by parents and do not need rescue unless injured or in immediate danger.  
+    Nestlings (featherless or with sparse down) require intervention if out of the nest.
+
+    ▸ If WRC is open: Contain in a small ventilated box lined with soft cloth and transport promptly.  
+    ▸ After hours: Keep the bird warm, quiet, and in a dark space. Do not feed or give water. Deliver to WRC first thing in the morning.
+
+    If the nest is intact and reachable, return the uninjured chick to it.
+
+bluejay:
+  category: songbird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "moderate"
+  age_assessment_needed: true
+  description: Bold, noisy songbird with blue plumage and a crest on its head. Known for mobbing predators and protecting young aggressively.
+  keywords:
+    shape: [medium, crested head]
+    color: [blue, white, black]
+    behavior: [calls loudly, mimics, mobs predators]
+    environment: [wooded areas, yards, feeders]
+  care_advice: >
+    Bluejay fledglings may be fiercely defended by parents. If uninjured, leave in place and monitor from a safe distance.  
+    Only intervene if the bird is injured or in immediate danger.
+
+    ▸ If WRC is open: Transport contained in a small, ventilated box.  
+    ▸ After hours: Keep warm, quiet, and dark until WRC opens. Avoid stress from handling.
+
+cardinal:
+  category: songbird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Medium-sized songbird with bright red plumage in males and warm brown tones in females. Distinctive crest and clear, whistling calls.
+  keywords:
+    shape: [medium, crested head]
+    color: [red, brown, black mask]
+    behavior: [sings, forages on ground, territorial]
+    environment: [shrubs, gardens, forest edges]
+  care_advice: >
+    Fledgling cardinals are often near the ground and watched over by parents.  
+    Return uninjured chicks to the nest if possible.
+
+    ▸ If WRC is open: Contain and transport if injured, cold, or abandoned.  
+    ▸ After hours: Keep in a quiet, dark, warm place until morning. No food or water.
+
+chickadee:
+  category: songbird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Small, active bird with a black cap and bib, white cheeks, and gray wings. Known for its “chick-a-dee-dee” call.
+  keywords:
+    shape: [small, round body]
+    color: [black cap, white cheeks, gray]
+    behavior: [flits, calls, hovers briefly]
+    environment: [woodlands, feeders, yards]
+  care_advice: >
+    If a fledgling chickadee is fully feathered and alert, monitor rather than intervene.  
+    Nestlings out of the nest should be returned if possible.
+
+    ▸ If WRC is open: Contain injured or cold birds and transport.  
+    ▸ After hours: Keep in a warm, quiet box until delivery in the morning.
+
+nuthatch:
+  category: songbird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Small bird with a long, pointed bill and habit of climbing headfirst down tree trunks. Usually blue-gray above and white below.
+  keywords:
+    shape: [small, pointed bill]
+    color: [blue-gray, white, black cap]
+    behavior: [climbs down trees, pecks bark]
+    environment: [forests, wooded yards]
+  care_advice: >
+    Healthy fledglings should be left for parental care.  
+    Return nestlings to the nest if safe.
+
+    ▸ If WRC is open: Transport contained if injured or orphaned.  
+    ▸ After hours: Keep warm, dark, and quiet until morning.
+
+finch:
+  category: songbird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Small, seed-eating bird with a conical bill. Common species include house finch and goldfinch.
+  keywords:
+    shape: [small, conical bill]
+    color: [varies—red, yellow, brown]
+    behavior: [sings, perches, flits]
+    environment: [feeders, shrubs, fields]
+  care_advice: >
+    Observe from a distance before intervening.  
+    Return uninjured nestlings to the nest if possible.
+
+    ▸ If WRC is open: Contain and transport if injured, orphaned, or cold.  
+    ▸ After hours: Keep warm and secure until morning.
+
+sparrow:
+  category: songbird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Small, brown or gray songbirds with short bills. Many species are common in urban and rural areas.
+  keywords:
+    shape: [small, short bill]
+    color: [brown, gray, streaked]
+    behavior: [hops, chirps, flocks]
+    environment: [yards, barns, cities]
+  care_advice: >
+    If uninjured and alert, fledgling sparrows should be left under parental care.  
+    Return uninjured nestlings to nest.
+
+    ▸ If WRC is open: Contain and transport if intervention is needed.  
+    ▸ After hours: Keep in a warm, quiet, dark container until morning.
+
+warbler:
+  category: songbird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Small, active insect-eating birds with varied and often bright plumage. Many are migratory.
+  keywords:
+    shape: [small, slender bill]
+    color: [varies—yellow, olive, gray]
+    behavior: [flits, gleans insects, sings]
+    environment: [woodlands, thickets, wetlands]
+  care_advice: >
+    Migratory warblers are sensitive to stress. If healthy and uninjured, leave in place.  
+    Handle minimally if rescue is needed.
+
+    ▸ If WRC is open: Transport promptly in a dark, ventilated box.  
+    ▸ After hours: Keep quiet, warm, and dark until morning.
+
+woodpecker:
+  category: songbird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "moderate"
+  age_assessment_needed: true
+  description: Birds with strong bills for drilling into wood and stiff tails for support. Includes downy, hairy, and pileated species.
+  keywords:
+    shape: [medium, chisel bill]
+    color: [black, white, red markings]
+    behavior: [pecks wood, climbs trunks]
+    environment: [forests, yards with trees]
+  care_advice: >
+    Return uninjured chicks to nest cavities if possible.  
+    Adult woodpeckers may defend nest aggressively.
+
+    ▸ If WRC is open: Transport contained if injured or orphaned.  
+    ▸ After hours: Keep in a dark, quiet box until morning.
+
+starling:
+  category: songbird
+  intervention_needed: "yes"
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "moderate"
+  age_assessment_needed: true
+  description: Non-native invasive bird with dark, iridescent plumage. Highly adaptable and aggressive toward other species.
+  keywords:
+    shape: [medium, sharp bill]
+    color: [black, iridescent green/purple]
+    behavior: [mimics, flocks, forages on ground]
+    environment: [urban, farms, fields]
+  care_advice: >
+    Because they are non-native, starlings are not protected by federal law.  
+    WRC may have different intake protocols — call before transport.
+
+    ▸ If WRC is open: Confirm acceptance, then transport if needed.  
+    ▸ After hours: Contain in a ventilated box and follow WRC guidance in the morning.
+
+grackle:
+  category: songbird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "moderate"
+  age_assessment_needed: true
+  description: Large blackbird with iridescent plumage and long tail. Often found in noisy flocks.
+  keywords:
+    shape: [large, long tail]
+    color: [black, iridescent blue/purple]
+    behavior: [flocks, forages, calls loudly]
+    environment: [fields, urban areas, wetlands]
+  care_advice: >
+    Fledglings may be on the ground but still cared for by parents.  
+    Only intervene if injured or orphaned.
+
+    ▸ If WRC is open: Contain and transport as needed.  
+    ▸ After hours: Keep warm, quiet, and dark until morning.
+
+duck:
+  category: waterfowl
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Aquatic bird with webbed feet and broad bill. Common species in Minnesota include mallards and wood ducks.
+  keywords:
+    shape: [medium, webbed feet, broad bill]
+    color: [varies—brown, green head, mottled]
+    behavior: [swims, dives, dabbles, flies]
+    environment: [lakes, ponds, rivers]
+  care_advice: >
+    Adult ducks usually do not require intervention unless injured or trapped.  
+    For injured birds, contain in a box with air holes and minimal handling.
+
+    ▸ If WRC is open: Transport promptly.  
+    ▸ After hours: Keep in a quiet, cool, dark place until morning. Do not feed.
+
+duckling:
+  category: waterfowl
+  intervention_needed: "yes"
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: false
+  description: Young duck covered in down, unable to fly. Dependent on mother for warmth and protection.
+  keywords:
+    shape: [small, fluffy, webbed feet]
+    color: [yellow, brown, mottled]
+    behavior: [peeps, swims, follows mother]
+    environment: [shorelines, ponds, grassy banks]
+  care_advice: >
+    If ducklings are separated from the mother, first attempt to locate and reunite them.  
+    Never place them in water without the mother — they can chill and drown.
+
+    ▸ If WRC is open: Contain in a ventilated box lined with soft cloth and transport.  
+    ▸ After hours: Keep warm with a heat source (rice sock or warm water bottle wrapped in cloth) in a quiet, dark space. Deliver to WRC in the morning.
+
+goose:
+  category: waterfowl
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Large waterfowl with long neck, loud honking call, and aggressive defense of nests/young. Commonly Canada geese.
+  keywords:
+    shape: [large, long neck, webbed feet]
+    color: [gray-brown, black neck, white chinstrap]
+    behavior: [honks, hisses, grazes, flies in V-formation]
+    environment: [lakes, golf courses, fields]
+  care_advice: >
+    Approach with caution — geese can strike with wings and bite.  
+    Intervene only for injury or entrapment.
+
+    ▸ If WRC is open: Use a towel or board as a barrier when containing. Transport promptly.  
+    ▸ After hours: Contain safely in a large, ventilated container. Keep in a cool, quiet place until morning. Avoid heat sources.
+
+gosling:
+  category: waterfowl
+  intervention_needed: "yes"
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: false
+  description: Young goose, down-covered and unable to fly. Highly dependent on parents for warmth and protection.
+  keywords:
+    shape: [small, fluffy, webbed feet]
+    color: [yellow, greenish, gray]
+    behavior: [peeps, follows parents, grazes]
+    environment: [shorelines, grassy fields]
+  care_advice: >
+    If separated from parents, attempt to reunite immediately.  
+    If parents are not found or reject the gosling, containment is necessary.
+
+    ▸ If WRC is open: Transport in a warm, ventilated box with soft cloth lining.  
+    ▸ After hours: Keep warm in a dark, quiet location. Avoid feeding; deliver to WRC in the morning.
+
+swan:
+  category: waterfowl
+  intervention_needed: conditional
+  referral_required: true
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Very large, white waterfowl with long neck and powerful wings. Known for territorial aggression.
+  keywords:
+    shape: [very large, long neck, webbed feet]
+    color: [white, orange bill, black facial markings]
+    behavior: [swims, hisses, flaps wings]
+    environment: [lakes, rivers, wetlands]
+  care_advice: >
+    Swans can cause serious injury. Intervene only if injured, entangled, or in obvious distress.  
+    Contact WRC for referral guidance.
+
+    ▸ If WRC is open: Call ahead for handling instructions before attempting capture.  
+    ▸ After hours: If safe containment is possible, keep in a large, ventilated pen away from people/pets. Otherwise, monitor until professional help arrives.
+
+loon:
+  category: waterfowl
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Large diving bird with dagger-like bill, red eyes in breeding season, and striking black-and-white plumage.
+  keywords:
+    shape: [large, sharp bill, streamlined body]
+    color: [black, white, spotted]
+    behavior: [dives, calls, floats low]
+    environment: [large lakes, reservoirs]
+  care_advice: >
+    Loons are vulnerable on land because their legs are set far back.  
+    They may beach themselves due to injury, illness, or being stranded on small water bodies.
+
+    ▸ If WRC is open: Contain in a large, padded, ventilated container. Transport promptly.  
+    ▸ After hours: Keep in a dark, cool, quiet location. Do not place in water or allow access to small tubs. Transport in the morning.
+
+owl:
+  category: raptor
+  intervention_needed: conditional
+  referral_required: true
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Nocturnal bird of prey with forward-facing eyes, facial disc, and powerful talons (e.g., great horned, barred, screech owls).
+  keywords:
+    shape: [medium-large, rounded head, sharp talons]
+    color: [brown, gray, white]
+    behavior: [hunts at night, silent flight, hoots]
+    environment: [forests, fields, suburbs]
+  care_advice: >
+    Do not attempt to rehabilitate yourself. If safe to do so, contain using a towel/blanket and place in a plastic pet kennel or sturdy box (no wire cages). Keep the container dark, quiet, and warm; avoid unnecessary stops. Do not feed or give water.
+
+    ▸ Contact The Raptor Center (TRC) at 612-624-4745. Phones are monitored 8:00 AM–7:00 PM daily; patients are admitted 8:00 AM–5:00 PM daily, including holidays. Speak with TRC staff before transporting any raptor.
+    ▸ Handling (only if absolutely necessary and safe): Wear thick gloves and eye protection. Approach slowly with a towel or blanket. Secure wings gently and place the bird in a ventilated plastic pet kennel or sturdy cardboard box (not wire cages). Keep the container dark, quiet, and warm. Avoid unnecessary stops or exposure to people/pets. Do not feed or give water.
+    ▸ After hours: Keep the bird secured in the container with a towel in a low‑traffic, dark, and quiet room. Do not open the container or attempt to feed. Call TRC at 8:00 AM and transport when admissions open.
+
+hawk:
+  category: raptor
+  intervention_needed: conditional
+  referral_required: true
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Diurnal raptor with hooked beak and strong talons (e.g., red‑tailed, Cooper’s, sharp‑shinned).
+  keywords:
+    shape: [medium-large, broad wings, hooked beak]
+    color: [brown, gray, white, mottled]
+    behavior: [soars, stoops, hunts small animals]
+    environment: [open fields, forests, suburban edges]
+  care_advice: >
+    Wear gloves/eye protection; approach slowly with a towel/blanket only if both you and the bird are in a safe location. Contain in a ventilated kennel or sturdy box just larger than the bird; keep dark and quiet. Do not feed or give water.
+
+    ▸ Contact The Raptor Center (TRC) at 612-624-4745. Phones are monitored 8:00 AM–7:00 PM daily; patients are admitted 8:00 AM–5:00 PM daily, including holidays. Speak with TRC staff before transporting any raptor.
+    ▸ Handling (only if absolutely necessary and safe): Wear thick gloves and eye protection. Approach slowly with a towel or blanket. Secure wings gently and place the bird in a ventilated plastic pet kennel or sturdy cardboard box (not wire cages). Keep the container dark, quiet, and warm. Avoid unnecessary stops or exposure to people/pets. Do not feed or give water.
+    ▸ After hours: Keep the bird secured in the container with a towel in a low‑traffic, dark, and quiet room. Do not open the container or attempt to feed. Call TRC at 8:00 AM and transport when admissions open.
+
+eagle:
+  category: raptor
+  intervention_needed: conditional
+  referral_required: true
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Very large, federally protected raptor (bald/golden) with massive talons and hooked beak.
+  keywords:
+    shape: [very large, powerful talons, hooked beak]
+    color: [brown, white head/tail (adult bald), golden brown]
+    behavior: [soars, scavenges, hunts fish/mammals]
+    environment: [lakeshores, rivers, open country]
+  care_advice: >
+    Extreme caution—large raptors can cause severe injury. Do not handle unless absolutely necessary and safe. If containment is required, use a large kennel/box; keep dark, quiet, and warm. Do not feed or give water.
+
+    ▸ Contact The Raptor Center (TRC) at 612-624-4745. Phones are monitored 8:00 AM–7:00 PM daily; patients are admitted 8:00 AM–5:00 PM daily, including holidays. Speak with TRC staff before transporting any raptor.
+    ▸ Handling (only if absolutely necessary and safe): Wear thick gloves and eye protection. Approach slowly with a towel or blanket. Secure wings gently and place the bird in a ventilated plastic pet kennel or sturdy cardboard box (not wire cages). Keep the container dark, quiet, and warm. Avoid unnecessary stops or exposure to people/pets. Do not feed or give water.
+    ▸ After hours: Keep the bird secured in the container with a towel in a low‑traffic, dark, and quiet room. Do not open the container or attempt to feed. Call TRC at 8:00 AM and transport when admissions open.
+
+falcon:
+  category: raptor
+  intervention_needed: conditional
+  referral_required: true
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Fast, pointed‑wing raptors (e.g., peregrine, merlin, kestrel) specialized for high‑speed hunting.
+  keywords:
+    shape: [medium-small, pointed wings, hooked beak]
+    color: [gray, brown, barred]
+    behavior: [dives at high speed, hunts birds/insects]
+    environment: [cliffs, cities, open country]
+  care_advice: >
+    If capture is necessary, approach slowly with towel/blanket; secure wings; place in ventilated kennel/box (not wire). Keep dark, quiet, and warm. Do not feed or give water.
+
+    ▸ Contact The Raptor Center (TRC) at 612-624-4745. Phones are monitored 8:00 AM–7:00 PM daily; patients are admitted 8:00 AM–5:00 PM daily, including holidays. Speak with TRC staff before transporting any raptor.
+    ▸ Handling (only if absolutely necessary and safe): Wear thick gloves and eye protection. Approach slowly with a towel or blanket. Secure wings gently and place the bird in a ventilated plastic pet kennel or sturdy cardboard box (not wire cages). Keep the container dark, quiet, and warm. Avoid unnecessary stops or exposure to people/pets. Do not feed or give water.
+    ▸ After hours: Keep the bird secured in the container with a towel in a low‑traffic, dark, and quiet room. Do not open the container or attempt to feed. Call TRC at 8:00 AM and transport when admissions open.
+
+osprey:
+  category: raptor
+  intervention_needed: conditional
+  referral_required: true
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Large, fish‑eating raptor with dark eye stripe and long wings; dives into water to catch prey.
+  keywords:
+    shape: [large, long wings, hooked beak, talons]
+    color: [brown, white, dark eye stripe]
+    behavior: [hovers, dives for fish, perches near water]
+    environment: [lakeshores, rivers, reservoirs]
+  care_advice: >
+    Use caution—talons are specialized for gripping and can puncture. If containment is required, use a large kennel/box; keep dark and quiet. Avoid water exposure. Do not feed or give water.
+
+    ▸ Contact The Raptor Center (TRC) at 612-624-4745. Phones are monitored 8:00 AM–7:00 PM daily; patients are admitted 8:00 AM–5:00 PM daily, including holidays. Speak with TRC staff before transporting any raptor.
+    ▸ Handling (only if absolutely necessary and safe): Wear thick gloves and eye protection. Approach slowly with a towel or blanket. Secure wings gently and place the bird in a ventilated plastic pet kennel or sturdy cardboard box (not wire cages). Keep the container dark, quiet, and warm. Avoid unnecessary stops or exposure to people/pets. Do not feed or give water.
+    ▸ After hours: Keep the bird secured in the container with a towel in a low‑traffic, dark, and quiet room. Do not open the container or attempt to feed. Call TRC at 8:00 AM and transport when admissions open.
+
+  squirrel:
+    category: rodent
+    intervention_needed: conditional
+    referral_required: false
+    dangerous: false
+    rabies_vector: false
+    needs_species_escalation: false
+    bat_exposure: false
+    potential_aggression: "no"
+    age_assessment_needed: true
+    description: A small, agile rodent commonly seen in trees and backyards, squirrels have bushy tails and are often gray, brown, or reddish in color.
+    keywords:
+      shape: [small, slender, bushy tail]
+      color: [gray, brown, reddish]
+      behavior: [climbs trees, chatters, fast movement, gathers nuts]
+      environment: [trees, backyards, parks, bird feeders]
+    care_advice: >
+      If you’ve found a baby squirrel, first check if it’s truly in need of help. If the squirrel is uninjured, warm, and seems alert, monitor it from a distance for 4–6 hours to see if the mother returns. Keep pets and people away. If the baby appears cold, is lying flat, injured, or hasn’t been retrieved by dusk, it will need assistance. 
+
+      Gently place the squirrel in a small box lined with a soft cloth (no terry towels or loose threads). Keep the box in a warm, quiet, and dark place away from people and pets. You can provide warmth using a rice sock or warm water bottle wrapped in cloth, but be sure there’s room for the animal to move away from the heat source.
+
+ ▸ **If WRC is open**: Bring the contained squirrel to WRC as soon as possible.  
+ ▸ **If WRC is closed**: Keep the squirrel secured overnight as described above, do not offer food or water, and transport it to WRC when it opens at 10 AM.
+
+      Avoid handling the squirrel unnecessarily. Do not attempt to feed or rehabilitate the animal yourself.
+
+ chipmunk:
+  category: mammal
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Small striped rodent with a short tail and quick movements. Frequently found darting around wooded areas and gardens.
+  keywords:
+    shape: [small, compact, striped]
+    color: [brown, tan, black stripes]
+    behavior: [scurries, chirps, hoards food]
+    environment: [rock piles, brush, garden beds]
+  care_advice: >
+    Healthy juvenile or adult chipmunks are independent and should be left alone unless injured or trapped in an unsafe area.
+    If you find a baby chipmunk (eyes closed, unable to run quickly) outside of its burrow, it may have been displaced by predators, pets, or construction.
+
+    ▸ **If WRC is open**: Place the chipmunk in a small ventilated box lined with soft cloth or paper towels. Keep warm and bring it to WRC immediately.  
+    ▸ **If WRC is closed**: Secure the chipmunk indoors in a warm, dark, quiet place overnight. Do not feed or offer water. Transport to WRC the next morning.
+
+    Avoid prolonged handling, loud noises, and bright light. Do not attempt to raise or keep the animal — chipmunks are highly stressed by human contact.
+
+  rabbit:
+    category: mammal
+    intervention_needed: conditional
+    referral_required: false
+    dangerous: false
+    rabies_vector: false
+    needs_species_escalation: false
+    bat_exposure: false
+    potential_aggression: "no"
+    age_assessment_needed: true
+    description: Eastern cottontail rabbits are small mammals with large ears and short fluffy tails. Young bunnies are often found in shallow ground nests in backyards or gardens.
+    keywords:
+      shape: [small, round, large ears, fluffy tail]
+      color: [brown, gray, white]
+      behavior: [hops, hides in nests, freezes when startled]
+      environment: [lawns, gardens, under shrubs, brush piles]
+    care_advice: >
+      If the bunny is larger than a tennis ball and has its eyes open with upright ears, it is likely independent and does not need rescue. If a nest has been disturbed by a pet or lawn equipment, gently place the bunnies back in the nest and cover with nesting material or dry grass. To protect the nest during the day, you can place an upside-down laundry basket (with holes for ventilation) staked to the ground and remove it at night to allow the mother access.
+
+      To monitor whether the mother is returning, lay two small pieces of string in an “X” over the nest and check the pattern after 12–24 hours. If the string is disturbed but the nest remains intact, the mother likely returned and no intervention is needed.
+
+      If the bunny is cold, alone for many hours, has visible injuries, ants or worms, or was caught by a cat or dog — it needs intervention.
+
+  ▸ **If WRC is open**: Place the bunny in a small ventilated box lined with soft cloth or paper towels. Keep it quiet and warm and bring it to WRC immediately.  
+  ▸ **If WRC is closed**: Secure the bunny in a small box with a soft towel or paper lining. Keep it indoors in a warm, quiet, and dark place overnight. Do not feed or disturb the animal. Transport it to WRC as soon as they open the next morning.
+
+      Avoid handling or feeding the bunny. Even baby rabbits can be easily stressed by human interaction. Minimal contact improves their chances of survival.
+
+opossum:
+  category: mammal
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Nocturnal scavenger with a long bare tail and pointed snout. Often seen at night or hit on roads.
+  keywords:
+    shape: [medium, long tail, pointed face]
+    color: [gray, white, pink nose]
+    behavior: [scavenges, plays dead, hisses]
+    environment: [garbage areas, under decks, roadways]
+  care_advice: >
+    Baby opossums found alone are often orphans, as they stay in their mother’s pouch or on her back until about 4–5 inches long (nose to rump). Adults seen wandering at night are usually healthy and should be left alone unless injured.
+
+    ▸ **If WRC is open**: Contain in a small, well-ventilated box lined with cloth. Keep warm and quiet. Transport to WRC as soon as possible.  
+    ▸ **If WRC is closed**: Secure the opossum in a dark, quiet, warm location overnight. Use a heating source if the animal feels cool to the touch. Do not feed or give water. Transport to WRC when it opens.
+
+    Wear gloves when handling — opossums can bite if cornered. Do not attempt to rehabilitate at home.
+
+mouse:
+  category: rodent
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Very small rodent with large ears and a long skinny tail. Often found in homes, garages, or fields.
+  keywords:
+    shape: [tiny, pointed nose, long tail]
+    color: [gray, brown, white]
+    behavior: [scurries, hides, squeaks]
+    environment: [walls, barns, pantries, grassy fields]
+  care_advice: >
+    Wild mice are capable of carrying disease and should be handled minimally. Uninjured adult mice should be released immediately near their point of capture. Baby mice (eyes closed, no fur) require immediate care from a licensed rehabber.
+
+    ▸ **If WRC is open**: Place in a secure container with ventilation and soft bedding. Keep warm and transport to WRC right away.  
+    ▸ **If WRC is closed**: Contain securely in a small box with soft cloth or paper. Keep in a warm, quiet, dark location overnight. Do not feed or give water. Deliver to WRC when they reopen.
+
+    Handle with gloves and avoid unnecessary contact.
+
+vole:
+  category: rodent
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Short-tailed, compact rodent resembling a mouse. Known for creating tunnels in lawns and fields.
+  keywords:
+    shape: [small, round, blunt nose]
+    color: [brown, gray]
+    behavior: [burrows, gnaws, scurries]
+    environment: [tall grass, fields, gardens]
+  care_advice: >
+    Adult voles are independent and rarely need intervention unless injured or trapped. Young voles without fur or with closed eyes may be orphans and need help.
+
+    ▸ **If WRC is open**: Place the vole in a ventilated container lined with cloth or paper towels. Keep warm and quiet. Bring to WRC immediately.  
+    ▸ **If WRC is closed**: Contain securely in a small box with bedding. Keep in a warm, dark, quiet location overnight. Do not feed or offer water. Transport to WRC when it reopens.
+
+    Avoid handling, as voles stress easily. Release healthy, uninjured adults at the site of capture.
+
+shrew:
+  category: mammal
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Tiny insect-eating mammal with a pointed nose and tiny eyes. Often confused with mice.
+  keywords:
+    shape: [tiny, pointed snout, short tail]
+    color: [gray, brown]
+    behavior: [scurries, squeaks, fast moving]
+    environment: [leaf litter, under logs, garden beds]
+  care_advice: >
+    Shrews have extremely high metabolisms and cannot survive long without food, so prompt transfer to WRC is critical. Adult shrews rarely need intervention unless injured or trapped indoors.
+
+    ▸ **If WRC is open**: Place the shrew in a small, secure, ventilated container lined with paper towels. Bring to WRC immediately.  
+    ▸ **If WRC is closed**: Keep in a small box with soft bedding in a warm, quiet, dark area overnight. Do not attempt to feed — improper food can cause fatal harm. Transport to WRC as soon as it opens.
+
+    Handle minimally and always wear gloves.
+
+mole:
+  category: mammal
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: false
+  description: Underground mammal with large front claws and nearly blind eyes. Leaves raised tunnels in soft ground.
+  keywords:
+    shape: [small, cylindrical, paddle feet]
+    color: [gray, velvety fur]
+    behavior: [digs, burrows, avoids light]
+    environment: [lawns, garden beds, soft soil]
+  care_advice: >
+    Healthy moles are well-adapted to underground life and should be left alone. Surface activity usually occurs only when displaced by flooding, digging, or injury.
+
+    ▸ **If WRC is open**: If injured, place in a ventilated container with soft cloth and keep in a dark, quiet place. Transport to WRC immediately.  
+    ▸ **If WRC is closed**: Keep the mole contained in a dark, warm area overnight with minimal disturbance. Do not feed or handle more than necessary. Transport to WRC upon reopening.
+
+    Avoid prolonged exposure to light and loud noise, as moles are highly sensitive to stress.
+
+raccoon:
+  category: mammal
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: true
+  rabies_vector: true
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: false
+  description: Nocturnal omnivore with a black facial mask and ringed tail; strong and potentially aggressive if cornered.
+  keywords:
+    shape: [medium, stocky, ringed tail]
+    color: [gray, black, white]
+    behavior: [climbs, growls, scavenges, hisses]
+    environment: [attics, garbage cans, wooded edges]
+  care_advice: >
+    Do not handle raccoons directly. They pose safety and disease risks (rabies, Baylisascaris). If injured or sick, avoid contact and seek expert guidance.
+    
+    If the caller insists on helping, the agent should transfer to a Critical‑Assistance workflow or escalate to a trained responder; large/aggressive animals may require animal control. 
+    
+    Exception: if a solitary baby is clearly injured, cold, or in danger, it may be gently contained from a distance in a secure ventilated box and transported to WRC. 
+    
+    After hours: if a vulnerable baby has already been contained, keep it secured in a warm, dark, quiet room away from people/pets and bring it to WRC when they open; do not feed or handle further. (This makes explicit the overnight step recommended in the review.) 
+
+skunk:
+  category: mammal
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: true
+  rabies_vector: true
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: false
+  description: Small black‑and‑white mammal recognized by a dorsal white stripe and defensive spray; rabies‑vector species.
+  keywords:
+    shape: [small, fluffy tail, stocky body]
+    color: [black, white]
+    behavior: [waddles, sprays, digs, sniffs]
+    environment: [under sheds, fields, woodpiles]
+  care_advice: >
+    Start with a clear safety warning and avoid direct handling; escalate urgent skunk situations to WRC staff or on‑call support rather than sending the caller elsewhere. 
+    
+    If capture is unavoidable, a towel‑covered box can be lowered slowly over the animal, then a rigid bottom slid under—preferably under expert guidance. 
+    
+    After hours: if a (rare) contained baby skunk must be held, keep it secured in a ventilated container in a quiet area away from people/pets and await transfer to WRC the next day; do not feed/handle. (Clarifies the minor overnight gap flagged in the review.)
+
+bat:
+  category: mammal
+  intervention_needed: yes
+  referral_required: false
+  dangerous: true
+  rabies_vector: true
+  needs_species_escalation: true
+  bat_exposure: true
+  potential_aggression: "yes"
+  age_assessment_needed: false
+  description: Small nocturnal flying mammal; frequently found in buildings or near lights. Rabies‑vector species requiring exposure screening.
+  keywords:
+    shape: [small, winged, delicate]
+    color: [brown, black, gray]
+    behavior: [flies, hangs, squeaks, avoids light]
+    environment: [attics, barns, night sky, eaves]
+  care_advice: >
+    Never touch with bare hands. Use gloves and place the bat in a secure ventilated container. If found in a room with a sleeping person, child, or anyone who cannot reliably report exposure, the bat must be contained for rabies testing via UMN Diagnostic Lab.
+    
+    Winter/early‑spring: bats found outdoors (e.g., on snow) often need care; contain and bring to WRC promptly. 
+    
+    After hours: keep the secured container in a cool, dark, quiet place away from people/pets and deliver first thing when WRC opens. Do not open the container or attempt to feed/give water. (Makes the implied overnight step explicit.)
+
+deer:
+  category: mammal
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Large herbivore with a reddish or gray-brown coat and white underside. Often seen near roads, fields, or woods.
+  keywords:
+    shape: [large, long legs, hooves]
+    color: [brown, white, gray]
+    behavior: [grazes, freezes in headlights, runs]
+    environment: [fields, forest edges, roadsides]
+  care_advice: >
+    Adult deer should only be approached if they are immobile due to injury, and only by trained personnel. Deer can cause serious injury with their hooves.
+
+    For fawns: If found lying quietly alone, do not assume they are abandoned — the mother leaves them hidden for hours.  
+    ▸ Healthy fawns (bright-eyed, quiet, lying flat) should be left alone unless in immediate danger.  
+    ▸ If injured, cold, crying persistently, or lying in an exposed/high-traffic area for many hours, intervention is needed.
+
+    Containment: For injured deer, keep a safe distance and call WRC for guidance — do not attempt to restrain without proper equipment.  
+    If WRC is open: Call immediately to arrange response.  
+    After hours: If the animal is in a dangerous location (e.g., roadway), contact local law enforcement or DNR.
+
+fawn:
+  category: mammal
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Young white-tailed deer with white spots. Usually lying quietly while mother forages nearby.
+  keywords:
+    shape: [small, slender, long legs]
+    color: [brown, white spots]
+    behavior: [lies still, quiet, hides in grass]
+    environment: [meadows, tall grass, near trees]
+  care_advice: >
+    Fawns are often left alone for hours by their mothers.  
+    ▸ If the fawn is lying quietly with eyes open and breathing calmly, leave it in place.  
+    ▸ If visibly injured, crying repeatedly, following people, or found in the same exposed spot for many hours, it needs help.
+
+    Containment: Wear gloves, gently place in a ventilated container or secure area away from pets/people. Avoid prolonged handling.  
+    If WRC is open: Call for immediate instructions before transporting.  
+    After hours: Keep in a quiet, dark, warm space and minimize contact until WRC opens.
+
+fox:
+  category: mammal
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: true
+  rabies_vector: true
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Small canid with pointed ears and bushy tail. Reddish or gray coat and often active at dusk or dawn.
+  keywords:
+    shape: [medium, long tail, pointed snout]
+    color: [red, gray, white]
+    behavior: [slinks, runs, digs, hunts rodents]
+    environment: [suburbs, forest edges, open fields]
+  care_advice: >
+    Healthy adult foxes should be left alone.  
+    Orphaned pups (kits) are often playful but still dependent until about 12 weeks old.
+
+    Injured or orphaned foxes require extreme caution due to rabies risk.  
+    ▸ Wear gloves, avoid direct contact with saliva.  
+    ▸ Contain in a sturdy, well-ventilated crate with a towel or blanket.  
+    ▸ Do not feed or give water.
+
+    If WRC is open: Call first for guidance before transporting.  
+    After hours: Keep contained in a dark, quiet place until morning, and notify WRC at opening.
+
+coyote:
+  category: mammal
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: true
+  rabies_vector: true
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Medium-sized predator similar to a small wolf. Grayish coat and long muzzle. Often avoids humans.
+  keywords:
+    shape: [medium-large, bushy tail, slender]
+    color: [gray, tan, brown]
+    behavior: [howls, runs fast, hunts small animals]
+    environment: [prairies, farms, wooded edges]
+  care_advice: >
+    Coyotes are generally shy but can be dangerous if injured or cornered.  
+    ▸ Do not approach without professional guidance.  
+    ▸ If an orphaned pup is found, observe from a distance — the mother may return.
+
+    For injured/orphaned individuals: Wear gloves, avoid handling, and contact WRC or DNR.  
+    Contain only if safe — use a large crate or keep in a secure outdoor enclosure away from pets/people.
+
+    If WRC is open: Call immediately for instructions.  
+    After hours: Keep in a quiet, dark, secure place until professional help is available.
+
+bobcat:
+  category: mammal
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: true
+  rabies_vector: true
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Elusive wild cat with short tail, tufted ears, and spotted coat. Much larger than a domestic cat.
+  keywords:
+    shape: [medium, muscular, short tail]
+    color: [brown, tan, spotted]
+    behavior: [stalks, pounces, avoids people]
+    environment: [forests, rocky terrain, brush]
+  care_advice: >
+    Bobcats are powerful predators and should never be handled by untrained individuals.  
+    ▸ Do not attempt to capture or transport without professional equipment.  
+    ▸ Orphaned kittens may vocalize but should only be rescued if the mother is confirmed dead.
+
+    If injured or in immediate danger: Keep at a safe distance and call WRC or DNR for dispatch.  
+    If WRC is open: Arrange for staff or trained volunteer transport.  
+    After hours: Contact DNR or local law enforcement for urgent assistance.
+
+beaver:
+  category: rodent
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Large aquatic rodent with a flat tail and strong teeth. Builds dams and lodges.
+  keywords:
+    shape: [large, wide tail, stocky]
+    color: [brown]
+    behavior: [chews wood, swims, builds dams]
+    environment: [streams, ponds, rivers]
+  care_advice: >
+    Beavers can deliver serious bites and should be handled with caution.  
+    ▸ Young beavers found alone may still be dependent — observe before intervening.  
+    ▸ Contain only if safe, in a large crate with water-resistant bedding.
+
+    If WRC is open: Call for guidance and transport promptly.  
+    After hours: Keep contained in a dark, cool place with minimal handling until WRC opens.
+
+muskrat:
+  category: rodent
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Small aquatic rodent with a long scaly tail. Often confused with beavers but smaller.
+  keywords:
+    shape: [medium-small, narrow tail]
+    color: [brown, gray]
+    behavior: [swims, burrows, forages in water]
+    environment: [ponds, wetlands, drainage ditches]
+  care_advice: >
+    Muskrats are shy and usually avoid people.  
+    ▸ Contain using gloves and a ventilated crate if injured or orphaned.  
+    ▸ Keep bedding dry; avoid submersion or wet enclosures.
+
+    If WRC is open: Bring in promptly.  
+    After hours: Keep in a cool, dark, quiet place until morning.
+
+mink:
+  category: mammal
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Sleek, carnivorous mammal with dark fur. Moves quickly along waterbanks and preys on small animals.
+  keywords:
+    shape: [small, elongated body, short legs]
+    color: [dark brown, black]
+    behavior: [hunts, swims, hides, paces]
+    environment: [riverbanks, wetlands, woods]
+  care_advice: >
+    Minks can be aggressive when threatened and have sharp teeth.  
+    ▸ Use thick gloves if containment is necessary.  
+    ▸ Injured or orphaned young should be placed in a secure crate with a towel for hiding.
+
+    If WRC is open: Bring in promptly.  
+    After hours: Keep warm and contained until morning.
+
+weasel:
+  category: mammal
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Very slender mammal with short legs and quick movement. Predatory and secretive.
+  keywords:
+    shape: [small, long body, short tail]
+    color: [brown, white (in winter), tan]
+    behavior: [stalks, darts, climbs, kills rodents]
+    environment: [fields, barns, underbrush]
+  care_advice: >
+    Weasels are agile and can deliver painful bites.  
+    ▸ Contain using gloves and a secure ventilated crate.  
+    ▸ Orphaned kits should be kept warm and dark.
+
+    If WRC is open: Transport immediately.  
+    After hours: Keep contained in a quiet, dark space until morning.
+
+groundhog:
+  category: rodent
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Chunky rodent also called a woodchuck. Known for burrowing and feeding on vegetation.
+  keywords:
+    shape: [medium-large, rounded body, short tail]
+    color: [brown, gray]
+    behavior: [digs, sunbathes, waddles]
+    environment: [open fields, roadside ditches, near buildings]
+  care_advice: >
+    Groundhogs can be defensive and bite when threatened.  
+    ▸ Contain in a sturdy crate with bedding if injured or orphaned.  
+    ▸ Wear gloves and avoid unnecessary handling.
+
+    If WRC is open: Bring in promptly.  
+    After hours: Keep in a cool, dark, quiet place until morning.
+
+woodchuck:
+  alias_for: groundhog
+  description: Alternate name for the groundhog, a chunky rodent known for burrowing and feeding on vegetation.
+  keywords:
+    shape: [medium-large, rounded body, short tail]
+    color: [brown, gray]
+    behavior: [digs, sunbathes, waddles]
+    environment: [open fields, roadside ditches, near buildings]
+
+turtle:
+  category: reptile
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: false
+  description: Reptile with a hard shell. Common in Minnesota ponds and wetlands. Moves slowly on land.
+  keywords:
+    shape: [round shell, short legs, flat body]
+    color: [green, brown, yellow]
+    behavior: [basks, crawls, retreats into shell]
+    environment: [ponds, roadsides, wetlands]
+  care_advice: >
+    Most turtles do not need rescue unless injured or in a dangerous location (e.g., roadway).  
+    ▸ For road crossings, move in the direction they were headed.  
+    ▸ If injured, place in a ventilated container without water.
+
+    If WRC is open: Bring injured turtles promptly.  
+    After hours: Keep in a cool, dark container with a damp cloth for humidity — do not submerge — until morning.
+
+painted_turtle:
+  category: reptile
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: false
+  description: Common Minnesota turtle with colorful red and yellow stripes on neck and legs. Often seen basking on logs.
+  keywords:
+    shape: [medium, domed shell]
+    color: [black, yellow, red]
+    behavior: [basks, swims, retreats into shell]
+    environment: [lakeshores, marshes, ponds]
+  care_advice: >
+    Painted turtles are semi-aquatic.  
+    ▸ Do not keep them in water after rescue — damp cloth in a ventilated container is ideal.  
+    ▸ Handle gently; they are not aggressive.
+
+    If WRC is open: Bring in promptly.  
+    After hours: Keep cool and quiet, and deliver in the morning.
+
+snapping_turtle:
+  category: reptile
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: false
+  description: Large aggressive turtle with long tail and powerful bite. Spiked shell and rough appearance.
+  keywords:
+    shape: [large, rugged shell, long tail]
+    color: [dark brown, gray]
+    behavior: [snaps, hides, crawls slowly]
+    environment: [muddy ponds, rivers, roadside ditches]
+  care_advice: >
+    Snapping turtles can cause severe injury.  
+    ▸ Use a shovel or board to gently lift from behind for relocation.  
+    ▸ Never pick up by the tail.  
+    ▸ For injured individuals, use a large sturdy container.
+
+    If WRC is open: Bring in promptly.  
+    After hours: Keep in a cool, secure container until morning.
+
+box_turtle:
+  category: reptile
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: false
+  description: Terrestrial turtle with high domed shell. Rare in Minnesota but may be found in southern areas.
+  keywords:
+    shape: [rounded shell, short legs]
+    color: [brown, orange, yellow markings]
+    behavior: [walks, hides, retracts limbs]
+    environment: [fields, forest floor, brushy areas]
+  care_advice: >
+    Because they are uncommon in Minnesota, box turtles may be escaped pets.  
+    ▸ Confirm species before release.  
+    ▸ Contain in a dry, ventilated box with hiding cover.
+
+    If WRC is open: Bring in for ID and evaluation.  
+    After hours: Keep in a quiet, room-temperature space until morning.
+
+snake:
+  category: reptile
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: false
+  description: Legless reptile. Most MN snakes are non-venomous and shy. Includes garter, fox, and bullsnakes.
+  keywords:
+    shape: [long, slender, no limbs]
+    color: [brown, black, striped, green]
+    behavior: [slithers, flicks tongue, hides]
+    environment: [rocks, grass, under logs]
+  care_advice: >
+    Non-venomous snakes can be relocated if in danger.  
+    ▸ Use gloves or a snake hook to move them.  
+    ▸ Injured snakes should be placed in a ventilated container with a secure lid.
+
+    If WRC is open: Bring injured snakes promptly.  
+    After hours: Keep in a cool, quiet space until morning.
+
+garter_snake:
+  category: reptile
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: false
+  description: Minnesota’s most common snake. Harmless, often with yellow stripes down a dark body.
+  keywords:
+    shape: [slender, small head]
+    color: [green, black, yellow stripes]
+    behavior: [slithers, hides in grass, basks]
+    environment: [lawns, near water, woodpiles]
+  care_advice: >
+    Garter snakes are harmless and beneficial for pest control.  
+    ▸ Relocate if necessary, handling gently.  
+    ▸ For injury, contain in a ventilated box with soft cloth.
+
+    If WRC is open: Bring in for evaluation.  
+    After hours: Keep cool and dark until morning.
+
+frog:
+  category: amphibian
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: false
+  description: Amphibian with smooth skin, long legs, and strong hops. Active during wet, warm weather.
+  keywords:
+    shape: [round body, long legs]
+    color: [green, brown, spotted]
+    behavior: [jumps, croaks, hides]
+    environment: [wetlands, ditches, under leaves]
+  care_advice: >
+    Frogs require moist conditions.  
+    ▸ Injured frogs should be placed in a ventilated container with damp paper towels.  
+    ▸ Avoid deep standing water in containers.
+
+    If WRC is open: Bring promptly.  
+    After hours: Keep cool, dark, and moist until morning.
+
+toad:
+  category: amphibian
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: false
+  description: Dry, warty-skinned amphibian. Slower than frogs, found in gardens and forest floors.
+  keywords:
+    shape: [plump, short legs]
+    color: [brown, gray, bumpy]
+    behavior: [hops, sits still, burrows]
+    environment: [gardens, trails, under rocks]
+  care_advice: >
+    Toads tolerate drier conditions than frogs but still require humidity.  
+    ▸ Contain with damp paper towels in a ventilated container.  
+    ▸ Avoid water deeper than their legs.
+
+    If WRC is open: Bring promptly.  
+    After hours: Keep cool and moist until morning.
+
+salamander:
+  category: amphibian
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: false
+  description: Slender amphibian with moist skin and long tail. Found in cool, damp environments.
+  keywords:
+    shape: [elongated body, four legs, long tail]
+    color: [black, yellow, red-spotted]
+    behavior: [hides, crawls slowly, nocturnal]
+    environment: [under logs, leaf litter, near water]
+  care_advice: >
+    Salamanders require high humidity and cool temperatures.  
+    ▸ Injured individuals should be kept in a ventilated container with damp moss or paper towels.  
+    ▸ Avoid exposure to heat or direct sunlight.
+
+    If WRC is open: Bring promptly.  
+    After hours: Keep cool, dark, and moist until morning.
+
+lizard:
+  category: reptile
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: false
+  description: Rare in MN, lizards have scaly skin and movable eyelids. May be confused with salamanders.
+  keywords:
+    shape: [slender body, four legs, tail]
+    color: [brown, tan, striped]
+    behavior: [basks, darts, climbs]
+    environment: [sunny rocks, sandy areas]
+  care_advice: >
+    Because lizards are rare in Minnesota, confirm species before handling.  
+    ▸ Contain in a ventilated, warm container with hiding space.  
+    ▸ Avoid chilling.
+
+    If WRC is open: Bring in for identification.  
+    After hours: Keep warm and secure until morning.
+
+crow:
+  category: bird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: false
+  description: Large black bird with loud caws and high intelligence. Often found in flocks near human activity.
+  keywords:
+    shape: [large, thick bill, long wings]
+    color: [black]
+    behavior: [calls, flies in groups, forages]
+    environment: [trees, roadsides, fields, cities]
+  care_advice: >
+    Crows are highly intelligent and can be defensive.  
+    ▸ For grounded or injured crows, use gloves and a ventilated box.  
+    ▸ Keep away from children and pets — their beaks can cause injury.  
+
+    If WRC is open: Transport immediately.  
+    After hours: Keep in a dark, quiet, secure container until morning.
+
+raven:
+  category: bird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: false
+  description: Larger and heavier than crows, with a shaggy throat and deeper voice. Rare in southern MN.
+  keywords:
+    shape: [very large, shaggy neck, wedge tail]
+    color: [black]
+    behavior: [soars, croaks, solitary]
+    environment: [forests, cliffs, rural areas]
+  care_advice: >
+    Ravens are powerful birds with strong beaks.  
+    ▸ Injured ravens should be contained in a large ventilated box.  
+    ▸ Avoid direct contact — use gloves.  
+
+    If WRC is open: Bring immediately.  
+    After hours: Keep in a cool, quiet place until morning.
+
+pigeon:
+  category: bird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: false
+  description: Urban bird with iridescent neck feathers and plump body. Common in cities and under bridges.
+  keywords:
+    shape: [medium, short beak, round body]
+    color: [gray, iridescent green/purple]
+    behavior: [pecks, flaps, nests on ledges]
+    environment: [cities, rooftops, barns]
+  care_advice: >
+    Pigeons adapt well to human environments but can carry parasites.  
+    ▸ Use gloves to handle.  
+    ▸ Place in a ventilated box lined with paper towels.  
+
+    If WRC is open: Transport promptly.  
+    After hours: Keep warm, dark, and quiet until morning.
+
+mourning_dove:
+  category: bird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Soft gray-brown bird with long tail and gentle cooing call. Often seen on telephone wires or feeding on ground.
+  keywords:
+    shape: [slim, pointed tail]
+    color: [gray, beige, black spots]
+    behavior: [coos, flies in bursts, pecks ground]
+    environment: [backyards, power lines, open spaces]
+  care_advice: >
+    Mourning doves are delicate and stress easily.  
+    ▸ Injured or fledgling doves should be contained in a small box with soft lining.  
+    ▸ Avoid loud noises and bright light.  
+
+    If WRC is open: Bring promptly.  
+    After hours: Keep secure and warm until morning.
+
+turkey:
+  category: bird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: false
+  description: Large ground-dwelling bird with fan-shaped tail and wattled neck. Common in rural areas.
+  keywords:
+    shape: [very large, long legs, fan tail]
+    color: [brown, black, red head]
+    behavior: [gobbles, struts, scratches ground]
+    environment: [fields, forests, roadsides]
+  care_advice: >
+    Turkeys can be aggressive and cause injury with wings or spurs.  
+    ▸ Injured turkeys should be approached cautiously.  
+    ▸ Contain in a large, sturdy crate if possible.  
+
+    If WRC is open: Bring immediately.  
+    After hours: Keep in a dark, quiet, well-ventilated enclosure until morning.
+
+pheasant:
+  category: bird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: true
+  description: Game bird with iridescent neck and long pointed tail. Males are brightly colored.
+  keywords:
+    shape: [medium-large, long tail]
+    color: [brown, green, red face]
+    behavior: [runs, flushes, nests on ground]
+    environment: [fields, roadsides, tall grass]
+  care_advice: >
+    Pheasants are fast and can injure themselves if handled roughly.  
+    ▸ Approach slowly to avoid flight panic.  
+    ▸ Place in a ventilated box with minimal light.  
+
+    If WRC is open: Bring promptly.  
+    After hours: Keep quiet and dark until morning.
+
+grouse:
+  category: bird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: false
+  description: Chicken-like bird with speckled plumage. Known for drumming sound during mating.
+  keywords:
+    shape: [plump, short tail, rounded wings]
+    color: [brown, gray, mottled]
+    behavior: [explodes into flight, drums, forages]
+    environment: [woodlands, brush, trails]
+  care_advice: >
+    Grouse can startle easily and may thrash in confinement.  
+    ▸ Use a dark box to minimize stress.  
+    ▸ Keep away from loud noise and bright light.  
+
+    If WRC is open: Transport promptly.  
+    After hours: Keep cool and quiet until morning.
+
+heron:
+  category: bird
+  intervention_needed: yes
+  referral_required: false
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: false
+  description: Tall wading bird with long neck and legs. Stands still while hunting fish in shallow water.
+  keywords:
+    shape: [tall, thin, long neck]
+    color: [gray, white, blue]
+    behavior: [stalks, stabs prey, flies with legs trailing]
+    environment: [wetlands, lakeshores, marshes]
+  care_advice: >
+    Herons can stab with their beaks and cause serious eye injury.  
+    ▸ Wear eye protection and use a towel or blanket to cover head and body during capture.  
+    ▸ Contain in a tall, ventilated crate.  
+
+    If WRC is open: Bring immediately.  
+    After hours: Keep covered and quiet until morning.
+
+crane:
+  category: bird
+  intervention_needed: yes
+  referral_required: false
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: false
+  description: Very tall bird with slow wingbeats and trumpeting call. Migrates in flocks.
+  keywords:
+    shape: [tall, long neck, long legs]
+    color: [gray, white, red patch]
+    behavior: [calls, flies in groups, dances]
+    environment: [wet meadows, fields, marshes]
+  care_advice: >
+    Cranes have strong beaks and sharp claws.  
+    ▸ Approach slowly with protective eyewear.  
+    ▸ Wrap in a blanket to immobilize wings before placing in a tall crate.  
+
+    If WRC is open: Bring immediately.  
+    After hours: Keep secure, dark, and quiet until morning.
+
+pelican:
+  category: bird
+  intervention_needed: yes
+  referral_required: false
+  dangerous: true
+  rabies_vector: false
+  needs_species_escalation: true
+  bat_exposure: false
+  potential_aggression: "yes"
+  age_assessment_needed: false
+  description: Very large white bird with massive beak and throat pouch. Often seen floating in groups.
+  keywords:
+    shape: [huge, long bill, short legs]
+    color: [white, yellow bill]
+    behavior: [glides, scoops fish, rests in flocks]
+    environment: [large lakes, river islands, reservoirs]
+  care_advice: >
+    Pelicans have powerful beaks that can injure hands and arms.  
+    ▸ Use a towel to wrap the head and secure wings before placing in a large crate.  
+    ▸ Avoid overheating during transport.  
+
+    If WRC is open: Bring immediately.  
+    After hours: Keep in a cool, well-ventilated crate until morning.
+
+baby_animal:
+  category: unknown
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: Used when caller reports an unidentified infant animal (mammal or bird). Triage questions needed to determine species.
+  keywords:
+    shape: [small, undeveloped, fuzzy or featherless]
+    color: [varied]
+    behavior: [cries, still, vulnerable]
+    environment: [ground, nest, box, grass]
+  care_advice: >
+    For unidentified infant animals, species identification is critical to determine proper care.  
+    ▸ Do not attempt to feed or give water.  
+    ▸ Place in a small ventilated box lined with soft cloth. Keep warm and quiet.  
+
+    If WRC is open: Call ahead and transport immediately.  
+    After hours: Secure in a warm, dark place until morning and minimize handling.
+
+wild_animal:
+  category: unknown
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: variable
+  rabies_vector: variable
+  needs_species_escalation: variable
+  bat_exposure: false
+  potential_aggression: "variable"
+  age_assessment_needed: false
+  description: Generic label for any unclassified wildlife. Prompt follow-up needed to narrow down type and behavior.
+  keywords:
+    shape: []
+    color: []
+    behavior: []
+    environment: []
+  care_advice: >
+    Gather as much descriptive information as possible to determine species.  
+    ▸ Keep a safe distance until species is identified.  
+    ▸ Contain only if safe to do so — use gloves and a ventilated container.  
+
+    If WRC is open: Contact for identification and advice.  
+    After hours: Keep contained and secure until morning, or release if safe and uninjured.
+
+bird:
+  category: bird
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: false
+  rabies_vector: false
+  needs_species_escalation: false
+  bat_exposure: false
+  potential_aggression: "no"
+  age_assessment_needed: true
+  description: General label for unclassified bird. May include fledglings, songbirds, or adults. Prompt for specific features.
+  keywords:
+    shape: [wings, beak, feathers]
+    color: [varied]
+    behavior: [chirps, hops, flies]
+    environment: [trees, ground, roofs]
+  care_advice: >
+    Observe from a distance to assess injury or orphaning.  
+    ▸ If the bird is hopping and feathered, it may be a fledgling — parents are likely nearby.  
+    ▸ If injured or in danger, place in a small ventilated box with a cloth lining.  
+
+    If WRC is open: Transport for evaluation.  
+    After hours: Keep in a quiet, dark place until morning.
+
+unknown:
+  category: unknown
+  intervention_needed: conditional
+  referral_required: false
+  dangerous: variable
+  rabies_vector: variable
+  needs_species_escalation: variable
+  bat_exposure: false
+  potential_aggression: "variable"
+  age_assessment_needed: false
+  description: No species identified. Used when caller provides no clear information. Requires further clarification.
+  keywords:
+    shape: []
+    color: []
+    behavior: []
+    environment: []
+  care_advice: >
+    Gather as much descriptive information as possible before intervening.  
+    ▸ Keep a safe distance until species can be identified.  
+    ▸ Contain only if safe and necessary.  
+
+    If WRC is open: Call for help with identification.  
+    After hours: Maintain safety and containment until species can be confirmed.
