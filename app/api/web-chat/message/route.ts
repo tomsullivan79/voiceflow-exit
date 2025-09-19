@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Look up existing mapping
+    // Lookup mapping
     let conversationId: string | null = null;
     {
       const { data, error } = await supabaseAdmin
@@ -58,12 +58,14 @@ export async function POST(req: NextRequest) {
       conversationId = data?.conversation_id ?? null;
     }
 
-    // Create conversation + mapping if missing
+    // Create conversation + mapping if needed
     if (!conversationId) {
       const { data: conv, error: convErr } = await supabaseAdmin
         .from("conversations")
         .insert({
-          user_id: ownerUserId,       // <- satisfy NOT NULL constraint
+          user_id: ownerUserId,         // satisfy NOT NULL
+          source: "web",                // add if your schema has this column (ignored if it doesn't)
+          title: "Web Chat",            // add if present (ignored if not)
         })
         .select("id")
         .single();
@@ -74,7 +76,6 @@ export async function POST(req: NextRequest) {
           { status: 500 }
         );
       }
-
       conversationId = conv.id;
 
       const { error: mapErr } = await supabaseAdmin
@@ -89,24 +90,73 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Insert the user's message
-    const { error: msgErr } = await supabaseAdmin
-      .from("conversation_messages")
-      .insert({
-        conversation_id: conversationId,
-        role: "user",
-        content: content.trim(),
-        message_sid: null, // SMS-only
-      });
+    // Insert USER message
+    {
+      const { error: msgErr } = await supabaseAdmin
+        .from("conversation_messages")
+        .insert({
+          conversation_id: conversationId!,
+          role: "user",
+          content: content.trim(),
+          message_sid: null,
+        });
 
-    if (msgErr) {
+      if (msgErr) {
+        return NextResponse.json(
+          { ok: false, stage: "insert-message-user", error: msgErr.message },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Call your existing /api/chat to get an assistant text
+    const host = req.headers.get("host")!;
+    const proto = req.headers.get("x-forwarded-proto") || "https";
+    const baseUrl = `${proto}://${host}`;
+
+    const chatRes = await fetch(`${baseUrl}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      // If your /api/chat streams, we still consume as text here
+      body: JSON.stringify({ input: content, remember: false }),
+      cache: "no-store",
+    });
+
+    if (!chatRes.ok) {
+      const t = await chatRes.text();
+      // Still return ok=false so the client can show an error
       return NextResponse.json(
-        { ok: false, stage: "insert-message", error: msgErr.message },
+        { ok: false, stage: "agent", error: t || `HTTP ${chatRes.status}`, conversation_id: conversationId },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ ok: true, conversation_id: conversationId });
+    const assistantText = (await chatRes.text()) || "(no response)";
+
+    // Insert ASSISTANT message
+    {
+      const { error: aErr } = await supabaseAdmin
+        .from("conversation_messages")
+        .insert({
+          conversation_id: conversationId!,
+          role: "assistant",
+          content: assistantText,
+          message_sid: null,
+        });
+
+      if (aErr) {
+        return NextResponse.json(
+          { ok: false, stage: "insert-message-assistant", error: aErr.message, conversation_id: conversationId },
+          { status: 500 }
+        );
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      conversation_id: conversationId,
+      assistant_text: assistantText,
+    });
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, stage: "handler", error: e?.message ?? "unexpected" },

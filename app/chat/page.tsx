@@ -7,11 +7,19 @@ import { supabaseBrowser } from "../../lib/supabaseBrowser";
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
+// --- Policy types mirrored from the API response ---
+type IntakeStatus = "accept" | "conditional" | "not_supported";
+type Policy =
+  | { type: "out_of_scope"; public_message: string; referrals: any[] }
+  | { type: "org_intake"; status: IntakeStatus; public_message: string | null; referrals: any[] }
+  | null;
+
 export default function WebChatPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [policy, setPolicy] = useState<Policy>(null); // ⬅️ NEW
   const abortRef = useRef<AbortController | null>(null);
 
   // Load prior history + conversation id
@@ -69,7 +77,6 @@ export default function WebChatPage() {
 
     return () => {
       supa.removeChannel(channel);
-      // optional: supa.realtime.disconnect(); // not necessary unless you want to fully tear down
     };
   }, [conversationId]);
 
@@ -83,7 +90,7 @@ export default function WebChatPage() {
     setSending(true);
 
     try {
-      // 1) Persist user message (creates conversation if needed)
+      // 1) Persist user message (creates conversation if needed) — API returns `policy` if detected
       const persist = await fetch("/api/web-chat/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -94,8 +101,12 @@ export default function WebChatPage() {
       if (!persist.ok || pjson?.ok === false) {
         const msg = pjson?.error ? `${pjson.stage ?? "persist"}: ${pjson.error}` : `HTTP ${persist.status}`;
         setMessages((m) => [...m, { role: "assistant", content: `Sorry—saving failed (${msg}).` }]);
+        setPolicy(null); // clear any prior banner on failure
         return;
       }
+
+      // NEW: capture policy (if any) for the banner
+      setPolicy(pjson?.policy ?? null);
 
       // If the conversation was just created, keep its id for realtime
       if (!conversationId && pjson?.conversation_id) {
@@ -155,6 +166,9 @@ export default function WebChatPage() {
     <main className="wt-main">
       <div className="wt-wrap">
         <BrandHeader title="Sage" subtitle="Wildlife Triage Agent" imageSrc="/Green_Sage.png" />
+
+        {/* Policy Banner (if any) */}
+        {policy && <PolicyBanner policy={policy} />}
 
         {/* Transcript */}
         <section className="wt-card wt-transcript">
@@ -224,6 +238,16 @@ export default function WebChatPage() {
           --sage-primary: #6DAF75; /* voiceflow primary */
           --text-dark: #0a0a0a;
           --text-light: #f5f5f5;
+
+          --blue-50:  #eff6ff;
+          --blue-200: #bfdbfe;
+          --blue-900: #1e3a8a;
+          --amber-50: #fffbeb;
+          --amber-200:#fde68a;
+          --amber-900:#78350f;
+          --emerald-50:#ecfdf5;
+          --emerald-200:#a7f3d0;
+          --emerald-900:#064e3b;
         }
 
         .wt-main {
@@ -245,6 +269,44 @@ export default function WebChatPage() {
           font-family: "UCity Pro", ui-sans-serif, system-ui, -apple-system, Segoe UI,
             Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
         }
+
+        /* --- Policy banner styles --- */
+        .wt-policy {
+          border-radius: 12px;
+          padding: 12px;
+          margin-top: 12px;
+          border: 1px solid;
+        }
+        .wt-policy h4 {
+          margin: 0 0 4px 0;
+          font-size: 14px;
+          font-weight: 700;
+        }
+        .wt-policy p {
+          margin: 0;
+          font-size: 14px;
+          line-height: 1.5;
+          white-space: pre-line;
+        }
+        .wt-referrals {
+          margin-top: 8px;
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .wt-ref {
+          font-size: 13px;
+          padding: 6px 10px;
+          border-radius: 10px;
+          background: #fff;
+          border: 1px solid rgba(0,0,0,0.12);
+          text-decoration: none;
+          color: inherit;
+        }
+
+        .wt-policy-blue   { background: var(--blue-50);   border-color: var(--blue-200);   color: var(--blue-900); }
+        .wt-policy-amber  { background: var(--amber-50);  border-color: var(--amber-200);  color: var(--amber-900); }
+        .wt-policy-green  { background: var(--emerald-50);border-color: var(--emerald-200);color: var(--emerald-900); }
 
         .wt-card {
           border-radius: 16px;
@@ -279,21 +341,22 @@ export default function WebChatPage() {
           gap: 10px;
         }
 
-        .wt-dot {
-          width: 28px;
-          height: 28px;
-          border-radius: 999px;
-          flex-shrink: 0;
+        .wt-avatar {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          display: grid;
+          place-items: center;
           background: var(--sage-200);
+          color: #fff;
+          font-weight: 700;
+          flex-shrink: 0;
         }
-        .wt-user {
+        .wt-avatar-user {
           background: var(--sage-500);
         }
-        .wt-assistant {
-          background: var(--sage-400);
-        }
 
-        .wt-msg {
+        .wt-bubble {
           flex: 1;
         }
 
@@ -380,8 +443,54 @@ export default function WebChatPage() {
           }
         }
       `}</style>
-
-      {/* (Keep your existing scoped CSS; omitted here for brevity) */}
     </main>
+  );
+}
+
+/* Inline banner component to keep this file self-contained */
+function PolicyBanner({ policy }: { policy: NonNullable<Policy> }) {
+  const toneClass =
+    policy.type === "out_of_scope"
+      ? "wt-policy wt-policy-blue"
+      : policy.type === "org_intake" && policy.status === "not_supported"
+      ? "wt-policy wt-policy-amber"
+      : "wt-policy wt-policy-green";
+
+  const headline =
+    policy.type === "out_of_scope"
+      ? "Not a wildlife case we can admit"
+      : policy.type === "org_intake" && policy.status === "not_supported"
+      ? "We’re not able to admit this species"
+      : "Admission may be possible — let’s evaluate together";
+
+  const message =
+    policy.type === "out_of_scope" ? policy.public_message : (policy.public_message ?? "");
+
+  const referrals = (policy as any).referrals ?? [];
+
+  return (
+    <section className={toneClass} role="status" aria-live="polite">
+      <h4>{headline}</h4>
+      {message && <p>{message}</p>}
+      {referrals.length > 0 && (
+        <div className="wt-referrals">
+          {referrals.map((r: any, idx: number) => (
+            <a
+              key={idx}
+              className="wt-ref"
+              href={r.url || (r.phone ? `tel:${r.phone}` : "#")}
+              target={r.url ? "_blank" : undefined}
+              rel="noreferrer"
+              title={r.phone ? `${r.label} • ${r.phone}` : r.label}
+              onClick={(e) => {
+                if (!r.url && !r.phone) e.preventDefault();
+              }}
+            >
+              {r.label}
+            </a>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
