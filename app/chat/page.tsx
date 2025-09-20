@@ -449,12 +449,12 @@ export default function WebChatPage() {
 
 /* Inline banner component to keep this file self-contained */
 function PolicyBanner({ policy }: { policy: NonNullable<Policy> }) {
-  const toneClass =
+  const tone =
     policy.type === "out_of_scope"
-      ? "wt-policy wt-policy-blue"
+      ? "info"
       : policy.type === "org_intake" && policy.status === "not_supported"
-      ? "wt-policy wt-policy-amber"
-      : "wt-policy wt-policy-green";
+      ? "warn"
+      : "ok";
 
   const headline =
     policy.type === "out_of_scope"
@@ -469,28 +469,130 @@ function PolicyBanner({ policy }: { policy: NonNullable<Policy> }) {
   const referrals = (policy as any).referrals ?? [];
 
   return (
-    <section className={toneClass} role="status" aria-live="polite">
-      <h4>{headline}</h4>
-      {message && <p>{message}</p>}
-      {referrals.length > 0 && (
-        <div className="wt-referrals">
-          {referrals.map((r: any, idx: number) => (
-            <a
-              key={idx}
-              className="wt-ref"
-              href={r.url || (r.phone ? `tel:${r.phone}` : "#")}
-              target={r.url ? "_blank" : undefined}
-              rel="noreferrer"
-              title={r.phone ? `${r.label} • ${r.phone}` : r.label}
-              onClick={(e) => {
-                if (!r.url && !r.phone) e.preventDefault();
-              }}
-            >
-              {r.label}
-            </a>
-          ))}
+    <section className={`wt-card wt-policy wt-policy-${tone}`} role="status" aria-live="polite">
+      <div className="wt-policy-accent" aria-hidden />
+      <div className="wt-policy-body">
+        <div className="wt-policy-head">
+          <span className={`wt-pill wt-pill-${tone}`}>
+            {tone === "info" ? "Out of scope" : tone === "warn" ? "Not supported" : "Conditional"}
+          </span>
+          <h4>{headline}</h4>
         </div>
-      )}
+        {message && <p className="wt-policy-text">{message}</p>}
+        {referrals.length > 0 && (
+          <div className="wt-referrals">
+            {referrals.map((r: any, idx: number) => (
+              <a
+                key={idx}
+                className="wt-ref"
+                href={r.url || (r.phone ? `tel:${r.phone}` : "#")}
+                target={r.url ? "_blank" : undefined}
+                rel="noreferrer"
+                title={r.phone ? `${r.label} • ${r.phone}` : r.label}
+                onClick={(e) => {
+                  if (!r.url && !r.phone) e.preventDefault();
+                }}
+              >
+                {r.label}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <style jsx>{`
+        /* Card shell already provided by wt-card, we just customize */
+        .wt-policy {
+          display: grid;
+          grid-template-columns: 6px 1fr;
+          gap: 12px;
+          padding: 14px;
+          align-items: start;
+          border-radius: 14px;
+          border: 1px solid rgba(0,0,0,0.08);
+          background: #fff;
+        }
+        @media (prefers-color-scheme: dark) {
+          .wt-policy {
+            background: #161616;
+            border-color: rgba(255,255,255,0.14);
+          }
+        }
+
+        .wt-policy-accent {
+          width: 6px;
+          border-radius: 8px;
+        }
+
+        .wt-policy-body { display: grid; gap: 8px; }
+
+        .wt-policy-head {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .wt-policy h4 {
+          margin: 0;
+          font-size: 15px;
+          font-weight: 700;
+        }
+
+        .wt-policy-text {
+          margin: 0;
+          font-size: 14px;
+          line-height: 1.55;
+          white-space: pre-line;
+          opacity: 0.95;
+        }
+
+        .wt-pill {
+          font-size: 12px;
+          line-height: 1;
+          padding: 6px 8px;
+          border-radius: 999px;
+          border: 1px solid transparent;
+          font-weight: 600;
+        }
+
+        /* Tones: info (out_of_scope), warn (not_supported), ok (conditional/accept) */
+        .wt-policy-info  .wt-policy-accent { background: #93c5fd; } /* blue-300 */
+        .wt-policy-warn  .wt-policy-accent { background: #fcd34d; } /* amber-300 */
+        .wt-policy-ok    .wt-policy-accent { background: #86efac; } /* green-300 */
+
+        .wt-pill-info { background: #eff6ff; border-color: #bfdbfe; color: #1e3a8a; }
+        .wt-pill-warn { background: #fffbeb; border-color: #fde68a; color: #78350f; }
+        .wt-pill-ok   { background: #ecfdf5; border-color: #a7f3d0; color: #064e3b; }
+
+        @media (prefers-color-scheme: dark) {
+          .wt-pill-info { background: rgba(147,197,253,0.15); border-color: rgba(191,219,254,0.35); color: #93c5fd; }
+          .wt-pill-warn { background: rgba(252,211,77,0.15); border-color: rgba(253,230,138,0.35); color: #fcd34d; }
+          .wt-pill-ok   { background: rgba(134,239,172,0.15); border-color: rgba(167,243,208,0.35); color: #86efac; }
+        }
+
+        .wt-referrals {
+          margin-top: 2px;
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .wt-ref {
+          font-size: 13px;
+          padding: 6px 10px;
+          border-radius: 10px;
+          background: #fff;
+          border: 1px solid rgba(0,0,0,0.12);
+          text-decoration: none;
+          color: inherit;
+        }
+        @media (prefers-color-scheme: dark) {
+          .wt-ref {
+            background: #1b1b1b;
+            border-color: rgba(255,255,255,0.12);
+          }
+        }
+      `}</style>
     </section>
   );
 }
+
