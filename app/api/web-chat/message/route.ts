@@ -1,165 +1,144 @@
 // app/api/web-chat/message/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
+import crypto from "node:crypto";
+import { supabaseAdmin } from "@/lib/supabaseServer";
+import { detectSpeciesSlugFromText, resolvePolicyForSpecies } from "@/lib/policy";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+/**
+ * This route:
+ * 1) Creates/reuses a conversation tied to a browser cookie (wt_web_cookie)
+ * 2) Inserts the user's message into conversation_messages
+ * 3) Detects species + resolves org policy
+ * 4) Returns { ok, conversation_id, speciesSlug, policy }
+ *
+ * IMPORTANT: It does NOT call /api/chat or return assistant text.
+ * The browser calls /api/chat separately and persists the assistant via /api/web-chat/assistant (your current flow).
+ */
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE!,
-  { auth: { persistSession: false } }
-);
+const COOKIE_NAME = "wt_web_cookie";
 
-export async function POST(req: NextRequest) {
+function getOrSetCookieId() {
+  const jar = cookies();
+  const existing = jar.get(COOKIE_NAME)?.value;
+  if (existing) return existing;
+  const id = crypto.randomUUID();
+  // 1-year cookie, path=/ so it works across the app
+  jar.set(COOKIE_NAME, id, { path: "/", maxAge: 60 * 60 * 24 * 365, httpOnly: false });
+  return id;
+}
+
+export async function POST(req: Request) {
+  const supa = supabaseAdmin();
   try {
-    const { content } = await req.json();
-    if (!content || typeof content !== "string" || !content.trim()) {
-      return NextResponse.json({ ok: false, error: "content required" }, { status: 400 });
+    const body = await req.json().catch(() => ({} as any));
+    const messageText: string = String(body?.content ?? "").trim();
+
+    if (!messageText) {
+      return NextResponse.json(
+        { ok: false, stage: "validate", error: "Missing content" },
+        { status: 400 }
+      );
     }
 
-    const ownerUserId = process.env.WEB_CHAT_OWNER_USER_ID;
-    if (!ownerUserId) {
+    const cookieId = getOrSetCookieId();
+
+    // 1) Look up or create conversation for this cookie
+    const { data: mapRow, error: mapErr } = await supa
+      .from("web_conversation_cookies")
+      .select("conversation_id")
+      .eq("cookie_id", cookieId)
+      .maybeSingle();
+
+    if (mapErr) {
+      console.error("[web-chat/message] cookie map select error:", mapErr);
       return NextResponse.json(
-        { ok: false, stage: "config", error: "WEB_CHAT_OWNER_USER_ID not set" },
+        { ok: false, stage: "cookie-select", error: mapErr.message },
         { status: 500 }
       );
     }
 
-    const jar = await cookies();
-    let cookieId = jar.get("wt_web_cookie")?.value as string | undefined;
+    let conversationId = mapRow?.conversation_id as string | null;
 
-    if (!cookieId) {
-      cookieId = crypto.randomUUID();
-      jar.set("wt_web_cookie", cookieId, {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 30, // 30 days
-      });
-    }
-
-    // Lookup mapping
-    let conversationId: string | null = null;
-    {
-      const { data, error } = await supabaseAdmin
-        .from("web_conversation_cookies")
-        .select("conversation_id")
-        .eq("cookie_id", cookieId)
-        .maybeSingle();
-
-      if (error) {
+    if (!conversationId) {
+      const ownerId = process.env.WEB_CHAT_OWNER_USER_ID;
+      if (!ownerId) {
         return NextResponse.json(
-          { ok: false, stage: "select-mapping", error: error.message },
+          { ok: false, stage: "config", error: "WEB_CHAT_OWNER_USER_ID missing" },
           { status: 500 }
         );
       }
-      conversationId = data?.conversation_id ?? null;
-    }
 
-    // Create conversation + mapping if needed
-    if (!conversationId) {
-      const { data: conv, error: convErr } = await supabaseAdmin
+      const { data: convIns, error: convErr } = await supa
         .from("conversations")
         .insert({
-          user_id: ownerUserId,         // satisfy NOT NULL
-          source: "web",                // add if your schema has this column (ignored if it doesn't)
-          title: "Web Chat",            // add if present (ignored if not)
+          user_id: ownerId,
+          source: "web",
+          title: "Web Chat",
         })
         .select("id")
         .single();
 
-      if (convErr || !conv) {
+      if (convErr || !convIns?.id) {
+        console.error("[web-chat/message] conversation insert error:", convErr);
         return NextResponse.json(
-          { ok: false, stage: "insert-conversation", error: convErr?.message ?? "no data" },
+          { ok: false, stage: "conversation-insert", error: convErr?.message || "insert failed" },
           { status: 500 }
         );
       }
-      conversationId = conv.id;
 
-      const { error: mapErr } = await supabaseAdmin
+      conversationId = convIns.id as string;
+
+      const { error: mapInsErr } = await supa
         .from("web_conversation_cookies")
         .insert({ cookie_id: cookieId, conversation_id: conversationId });
 
-      if (mapErr) {
+      if (mapInsErr) {
+        console.error("[web-chat/message] cookie map insert error:", mapInsErr);
+        // Non-fatal; we still have a conversation — but return 500 to be explicit
         return NextResponse.json(
-          { ok: false, stage: "insert-mapping", error: mapErr.message },
+          { ok: false, stage: "cookie-insert", error: mapInsErr.message },
           { status: 500 }
         );
       }
     }
 
-    // Insert USER message
-    {
-      const { error: msgErr } = await supabaseAdmin
-        .from("conversation_messages")
-        .insert({
-          conversation_id: conversationId!,
-          role: "user",
-          content: content.trim(),
-          message_sid: null,
-        });
-
-      if (msgErr) {
-        return NextResponse.json(
-          { ok: false, stage: "insert-message-user", error: msgErr.message },
-          { status: 500 }
-        );
-      }
-    }
-
-    // Call your existing /api/chat to get an assistant text
-    const host = req.headers.get("host")!;
-    const proto = req.headers.get("x-forwarded-proto") || "https";
-    const baseUrl = `${proto}://${host}`;
-
-    const chatRes = await fetch(`${baseUrl}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      // If your /api/chat streams, we still consume as text here
-      body: JSON.stringify({ input: content, remember: false }),
-      cache: "no-store",
+    // 2) Insert the user's message
+    const { error: msgErr } = await supa.from("conversation_messages").insert({
+      conversation_id: conversationId,
+      role: "user",
+      content: messageText,
     });
 
-    if (!chatRes.ok) {
-      const t = await chatRes.text();
-      // Still return ok=false so the client can show an error
+    if (msgErr) {
+      console.error("[web-chat/message] message insert error:", msgErr);
       return NextResponse.json(
-        { ok: false, stage: "agent", error: t || `HTTP ${chatRes.status}`, conversation_id: conversationId },
+        { ok: false, stage: "message-insert", error: msgErr.message },
         { status: 500 }
       );
     }
 
-    const assistantText = (await chatRes.text()) || "(no response)";
-
-    // Insert ASSISTANT message
-    {
-      const { error: aErr } = await supabaseAdmin
-        .from("conversation_messages")
-        .insert({
-          conversation_id: conversationId!,
-          role: "assistant",
-          content: assistantText,
-          message_sid: null,
-        });
-
-      if (aErr) {
-        return NextResponse.json(
-          { ok: false, stage: "insert-message-assistant", error: aErr.message, conversation_id: conversationId },
-          { status: 500 }
-        );
-      }
+    // 3) Detect species + resolve policy
+    const speciesSlug = await detectSpeciesSlugFromText(messageText);
+    let policy = null as any;
+    if (speciesSlug) {
+      policy = await resolvePolicyForSpecies(speciesSlug);
     }
 
+    // TEMP debug to Vercel logs (remove later)
+    console.log("[web-chat/message] species/policy:", { speciesSlug, hasPolicy: !!policy });
+
+    // 4) Return result — NO assistant text here
     return NextResponse.json({
       ok: true,
       conversation_id: conversationId,
-      assistant_text: assistantText,
+      speciesSlug: speciesSlug ?? null,
+      policy, // consumed by app/chat/page.tsx
     });
-  } catch (e: any) {
+  } catch (err: any) {
+    console.error("[web-chat/message] fatal error:", err);
     return NextResponse.json(
-      { ok: false, stage: "handler", error: e?.message ?? "unexpected" },
+      { ok: false, stage: "route", error: err?.message || String(err) },
       { status: 500 }
     );
   }
