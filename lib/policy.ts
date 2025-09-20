@@ -1,104 +1,175 @@
 // lib/policy.ts
 import { supabaseAdmin } from '@/lib/supabaseServer';
 
-export type IntakeStatus = 'accept' | 'conditional' | 'not_supported';
+type OutOfScopePolicy = {
+  type: 'out_of_scope';
+  public_message: string | null;
+  referrals: any[]; // kept loose for now
+};
 
-export type PolicyResult =
-  | { type: 'out_of_scope'; public_message: string; referrals: any[] }
-  | { type: 'org_intake'; status: IntakeStatus; public_message: string | null; referrals: any[] }
-  | null;
+type IntakeStatus = 'accept' | 'conditional' | 'not_supported';
 
-/**
- * Resolve policy for a canonical wildlife species slug (e.g., "raccoon").
- * Returns either org intake policy, an out-of-scope policy, or null if none.
- */
-export async function resolvePolicyForSpecies(
-  speciesSlug: string,
-  orgSlug = process.env.ORG_SLUG || 'wrc-mn'
-): Promise<PolicyResult> {
-  const supabase = supabaseAdmin();
+type OrgIntakePolicy = {
+  type: 'org_intake';
+  status: IntakeStatus;
+  public_message: string | null;
+  referrals: any[];
+};
 
-  // 1) out-of-scope (dog/cat/etc.)
-  const { data: oos, error: oosErr } = await supabase
+export type ResolvedPolicy = OutOfScopePolicy | OrgIntakePolicy | null;
+
+/** Basic fold + normalize to compare human text robustly */
+function normalize(s: string): string {
+  return (
+    s
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '') // strip diacritics
+      .replace(/[_\-]+/g, ' ')         // underscores/hyphens → space
+      .replace(/[^a-z0-9]+/g, ' ')     // non-alphanum → space
+      .replace(/\s+/g, ' ')            // collapse spaces
+      .trim()
+  );
+}
+
+/** Make a list of candidate needles (singular + naive plural) */
+function expandTerm(term: string): string[] {
+  const t = normalize(term);
+  if (!t) return [];
+  const out = new Set<string>([t]);
+  // naive pluralization for common words, e.g., dog → dogs, fawn → fawns, mouse → mice (special-case)
+  if (t === 'mouse') out.add('mice');
+  else if (t.endsWith('y') && !/[aeiou]y$/.test(t)) out.add(t.slice(0, -1) + 'ies');
+  else if (!t.endsWith('s')) out.add(t + 's');
+  return Array.from(out);
+}
+
+/** Pads both haystack and needle with spaces to preserve word-ish boundaries */
+function includesWholeWord(hay: string, needle: string): boolean {
+  const h = ` ${normalize(hay)} `;
+  const n = ` ${normalize(needle)} `;
+  return h.includes(n);
+}
+
+export async function detectSpeciesSlugFromText(text: string): Promise<string | null> {
+  const supa = supabaseAdmin();
+
+  // Normalize the query once
+  const q = ` ${normalize(text)} `;
+
+  // 1) Load canonical species + common names
+  const [{ data: species, error: speciesErr }, { data: aliases, error: aliasErr }, { data: oos, error: oosErr }] =
+    await Promise.all([
+      supa.from('species_meta').select('slug, common_name'),
+      supa.from('species_aliases').select('alias, canonical_slug'),
+      supa.from('out_of_scope_species').select('slug, display_name'),
+    ]);
+
+  if (speciesErr) {
+    console.error('[policy] species_meta error:', speciesErr);
+  }
+  if (aliasErr) {
+    console.error('[policy] species_aliases error:', aliasErr);
+  }
+  if (oosErr) {
+    console.error('[policy] out_of_scope_species error:', oosErr);
+  }
+
+  // Gazetteer for pets/synonyms that people use frequently
+  const synonymMap: Record<string, string> = {
+    puppy: 'dog',
+    pup: 'dog',
+    doggo: 'dog',
+    hound: 'dog',
+    pooch: 'dog',
+    kitty: 'cat',
+    kitten: 'cat',
+    kittycat: 'cat',
+  };
+
+  type Term = { term: string; canonical: string };
+  const terms: Term[] = [];
+
+  // 2) Out-of-scope rows (e.g., dog/cat) get top priority
+  for (const row of oos ?? []) {
+    const canonical = row.slug;
+    const candidates = new Set<string>([row.slug, row.display_name].filter(Boolean) as string[]);
+    // add synonyms for pets
+    if (canonical === 'dog') Object.keys(synonymMap).forEach((k) => synonymMap[k] === 'dog' && candidates.add(k));
+    if (canonical === 'cat') Object.keys(synonymMap).forEach((k) => synonymMap[k] === 'cat' && candidates.add(k));
+    for (const c of candidates) expandTerm(c).forEach((t) => terms.push({ term: t, canonical }));
+  }
+
+  // 3) Canonical wildlife species (slug + common_name)
+  for (const row of species ?? []) {
+    const canonical = row.slug as string;
+    const candidates = new Set<string>([row.slug, row.common_name].filter(Boolean) as string[]);
+    for (const c of candidates) expandTerm(c).forEach((t) => terms.push({ term: t, canonical }));
+  }
+
+  // 4) Aliases
+  for (const a of aliases ?? []) {
+    const canonical = a.canonical_slug as string;
+    expandTerm(a.alias as string).forEach((t) => terms.push({ term: t, canonical }));
+  }
+
+  // 5) Greedy but safe-ish matching with spaced boundaries
+  for (const { term, canonical } of terms) {
+    if (q.includes(` ${term} `)) {
+      return canonical;
+    }
+  }
+
+  // 6) Fallback: single-word needles without space guards (helps for punctuation edge cases)
+  for (const { term, canonical } of terms) {
+    if (!term.includes(' ') && normalize(text).includes(term)) {
+      return canonical;
+    }
+  }
+
+  return null;
+}
+
+export async function resolvePolicyForSpecies(slug: string, orgSlug = process.env.ORG_SLUG || 'wrc-mn'): Promise<ResolvedPolicy> {
+  const supa = supabaseAdmin();
+
+  // A) Out-of-scope first (dog/cat/etc.)
+  const { data: oos, error: oosErr } = await supa
     .from('out_of_scope_species')
     .select('public_message, referrals')
-    .eq('slug', speciesSlug)
+    .eq('slug', slug)
     .maybeSingle();
-  if (!oosErr && oos) {
+
+  if (oosErr) {
+    console.error('[policy] out_of_scope lookup error:', oosErr);
+  }
+  if (oos) {
     return {
       type: 'out_of_scope',
-      public_message: oos.public_message,
-      referrals: (oos.referrals as any[]) ?? [],
+      public_message: (oos as any).public_message ?? null,
+      referrals: (oos as any).referrals ?? [],
     };
   }
 
-  // 2) org intake policy for a recognized wildlife species
-  const { data: pol, error: polErr } = await supabase
+  // B) Org-specific intake policy
+  const { data: pol, error: polErr } = await supa
     .from('org_intake_policies')
     .select('intake_status, public_message, referrals')
     .eq('org_slug', orgSlug)
-    .eq('species_slug', speciesSlug)
+    .eq('species_slug', slug)
     .maybeSingle();
 
-  if (!polErr && pol) {
+  if (polErr) {
+    console.error('[policy] org_intake_policies lookup error:', polErr);
+  }
+  if (pol) {
     return {
       type: 'org_intake',
-      status: pol.intake_status as IntakeStatus,
-      public_message: pol.public_message ?? null,
-      referrals: (pol.referrals as any[]) ?? [],
+      status: (pol as any).intake_status as IntakeStatus,
+      public_message: (pol as any).public_message ?? null,
+      referrals: (pol as any).referrals ?? [],
     };
   }
 
   return null;
-}
-
-/**
- * Ultra-light species matcher:
- *  - loads slugs + common_names + aliases once per request,
- *  - returns the first canonical slug found in the text (word-boundary match).
- * This is intentionally simple and fast to unblock the banner; we can swap later.
- */
-export async function detectSpeciesSlugFromText(
-  text: string
-): Promise<string | null> {
-  const q = (text || '').toLowerCase();
-  if (!q) return null;
-
-  const supabase = supabaseAdmin();
-
-  // pull terms
-  const [{ data: species }, { data: aliases }] = await Promise.all([
-    supabase.from('species_meta').select('slug, common_name'),
-    supabase.from('species_aliases').select('alias, canonical_slug'),
-  ]);
-
-  const terms: Array<{ term: string; canonical: string }> = [];
-
-  (species ?? []).forEach((s: any) => {
-    if (s.slug) terms.push({ term: String(s.slug).toLowerCase(), canonical: s.slug });
-    if (s.common_name) terms.push({ term: String(s.common_name).toLowerCase(), canonical: s.slug });
-  });
-  (aliases ?? []).forEach((a: any) => {
-    if (a.alias && a.canonical_slug) {
-      terms.push({ term: String(a.alias).toLowerCase(), canonical: a.canonical_slug });
-    }
-  });
-
-  // check simple word-boundary matches, longest terms first (avoid "cat" inside "bobcat")
-  terms.sort((a, b) => b.term.length - a.term.length);
-
-  for (const { term, canonical } of terms) {
-    if (!term) continue;
-    // word boundary: handles spaces/underscore/hyphen variants
-    const pattern = new RegExp(`(?:^|\\b|_|-)${
-      escapeRegExp(term)
-    }(?:\\b|_|-|s\\b|$)`, 'i');
-    if (pattern.test(q)) return canonical;
-  }
-
-  return null;
-}
-
-function escapeRegExp(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
