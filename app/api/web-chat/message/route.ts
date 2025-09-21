@@ -124,10 +124,15 @@ async function ensureConversationId(
 ): Promise<string> {
   if (convId) return convId;
 
-  // Minimal insert — only fields we know exist.
+  const WEB_CHAT_OWNER_USER_ID = process.env.WEB_CHAT_OWNER_USER_ID;
+  if (!WEB_CHAT_OWNER_USER_ID) {
+    throw new Error("WEB_CHAT_OWNER_USER_ID env not set");
+  }
+
+  // Minimal insert with required user_id
   const { data, error } = await supabase
     .from("conversations")
-    .insert({ title: null, created_ip: ip }) // no 'source' here
+    .insert({ title: null, created_ip: ip, user_id: WEB_CHAT_OWNER_USER_ID })
     .select("id")
     .maybeSingle();
 
@@ -144,3 +149,4 @@ async function ensureConversationId(
 
   return data.id;
 }
+
