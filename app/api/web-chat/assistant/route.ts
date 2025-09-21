@@ -1,69 +1,85 @@
 // app/api/web-chat/assistant/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "../../../../lib/supabaseServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE!,
-  { auth: { persistSession: false } }
-);
+const WEB_COOKIE = "wt_web_cookie";         // anon visitor cookie → mapping table
+const CONV_COOKIE = "wt_conversation_id";   // direct conversation id cookie set by /api/web-chat/message
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const { content } = await req.json();
-    if (!content || typeof content !== "string") {
-      return NextResponse.json({ ok: false, error: "content required" }, { status: 400 });
+    const body = await req.json().catch(() => null);
+    const content = (body?.content ?? "").toString();
+    if (!content || !content.trim()) {
+      return NextResponse.json({ ok: false, error: "empty_content", stage: "validate" }, { status: 400 });
     }
 
     const jar = await cookies();
-    const cookieId = jar.get("wt_web_cookie")?.value;
-    if (!cookieId) {
-      return NextResponse.json({ ok: false, error: "no cookie mapping" }, { status: 400 });
+
+    // 1) Try direct conversation cookie first (new flow)
+    let conversationId: string | null = jar.get(CONV_COOKIE)?.value || null;
+
+    // 2) Fallback to old mapping via wt_web_cookie
+    if (!conversationId) {
+      const webCookieId = jar.get(WEB_COOKIE)?.value || null;
+      if (webCookieId) {
+        const admin = supabaseAdmin();
+        const { data: map, error: mapErr } = await admin
+          .from("web_conversation_cookies")
+          .select("conversation_id")
+          .eq("cookie_id", webCookieId)
+          .maybeSingle();
+
+        if (mapErr) {
+          return NextResponse.json(
+            { ok: false, error: mapErr.message, stage: "select-mapping" },
+            { status: 500 }
+          );
+        }
+        if (map?.conversation_id) {
+          conversationId = map.conversation_id as string;
+        }
+      }
     }
 
-    // Find the mapped conversation
-    const { data: map, error: mapErr } = await supabaseAdmin
-      .from("web_conversation_cookies")
-      .select("conversation_id")
-      .eq("cookie_id", cookieId)
-      .maybeSingle();
-
-    if (mapErr) {
+    if (!conversationId) {
+      // No mapping and no conversation cookie — cannot persist assistant
       return NextResponse.json(
-        { ok: false, stage: "select-mapping", error: mapErr.message },
-        { status: 500 }
+        { ok: false, error: "no_cookie_mapping", stage: "resolve" },
+        { status: 400 }
       );
     }
-    if (!map?.conversation_id) {
-      return NextResponse.json({ ok: false, error: "no conversation for cookie" }, { status: 404 });
-    }
 
-    // Insert assistant message
-    const { error: insErr } = await supabaseAdmin
-      .from("conversation_messages")
-      .insert({
-        conversation_id: map.conversation_id,
-        role: "assistant",
-        content,
-        message_sid: null,
-      });
-
+    // 3) Persist assistant message
+    const admin = supabaseAdmin();
+    const { error: insErr } = await admin.from("conversation_messages").insert({
+      conversation_id: conversationId,
+      role: "assistant",
+      content,
+    });
     if (insErr) {
       return NextResponse.json(
-        { ok: false, stage: "insert-message-assistant", error: insErr.message },
+        { ok: false, error: insErr.message, stage: "persist_assistant" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ ok: true, conversation_id: map.conversation_id });
+    return NextResponse.json({ ok: true, conversation_id: conversationId }, { status: 200 });
   } catch (e: any) {
     return NextResponse.json(
-      { ok: false, stage: "handler", error: e?.message ?? "unexpected" },
+      { ok: false, error: e?.message ?? "unexpected", stage: "handler" },
       { status: 500 }
     );
   }
+}
+
+// GET → 405 (intentional; this endpoint is POST-only)
+export async function GET() {
+  return NextResponse.json(
+    { ok: false, error: "method_not_allowed" },
+    { status: 405 }
+  );
 }
