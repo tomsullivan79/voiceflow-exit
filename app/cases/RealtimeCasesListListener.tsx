@@ -5,34 +5,23 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 
-/**
- * On /cases list, refresh the page when:
- * - any conversation_messages row is INSERTed (realtime path)
- * - OR polling heartbeat detects a new latest message id (fallback path)
- */
 export default function RealtimeCasesListListener() {
   const router = useRouter();
   const pollTimerRef = useRef<number | null>(null);
   const lastSeenIdRef = useRef<string | null>(null);
   const refreshingRef = useRef(false);
+  const safetyRef = useRef<number | null>(null); // NEW: keep safety timeout id
 
   useEffect(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
     const supabase = createClient(url, anon, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
       realtime: { params: { eventsPerSecond: 2 } },
     });
 
-    const log = (...args: any[]) => {
-      // eslint-disable-next-line no-console
-      console.log("[cases-rt]", ...args);
-    };
+    const log = (...args: any[]) => console.log("[cases-rt]", ...args);
 
     const refreshSoon = () => {
       if (refreshingRef.current) return;
@@ -43,7 +32,6 @@ export default function RealtimeCasesListListener() {
       }, 120);
     };
 
-    // Polling fallback (7s)
     const pollOnce = async () => {
       try {
         const res = await fetch("/api/cases/heartbeat-list", { cache: "no-store" });
@@ -75,7 +63,6 @@ export default function RealtimeCasesListListener() {
       log("polling started (7s)");
     };
 
-    // Try realtime first
     supabase.auth.getSession().then(({ data }) => {
       const hasSession = !!data.session;
       log("session?", hasSession);
@@ -89,26 +76,15 @@ export default function RealtimeCasesListListener() {
         .channel("cases-list")
         .on(
           "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "conversation_messages",
-          },
+          { event: "INSERT", schema: "public", table: "conversation_messages" },
           (payload) => {
             log("message INSERT", payload?.new?.id || "");
             refreshSoon();
           }
         )
-        // Optional: also listen for case closures being updated
         .on(
           "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "conversations",
-            // only react if closed_at changed
-            filter: "closed_at=is.not.null",
-          },
+          { event: "UPDATE", schema: "public", table: "conversations", filter: "closed_at=is.not.null" },
           (payload) => {
             log("conversation UPDATE (closed)", payload?.new?.id || "");
             refreshSoon();
@@ -116,14 +92,25 @@ export default function RealtimeCasesListListener() {
         )
         .subscribe((status) => {
           log("channel status:", status);
-          if (status !== "SUBSCRIBED") startPolling();
+          if (status === "SUBSCRIBED") {
+            // NEW: cancel safety fallback if realtime is healthy
+            if (safetyRef.current) {
+              window.clearTimeout(safetyRef.current);
+              safetyRef.current = null;
+            }
+          } else {
+            startPolling();
+          }
         });
 
-      // Safety fallback: if no realtime event arrives at all in 10s, begin polling
-      const safety = window.setTimeout(startPolling, 10000);
+      // Safety: if we don’t get SUBSCRIBED in 10s, start polling
+      safetyRef.current = window.setTimeout(startPolling, 10000);
 
       return () => {
-        window.clearTimeout(safety);
+        if (safetyRef.current) {
+          window.clearTimeout(safetyRef.current);
+          safetyRef.current = null;
+        }
         supabase.removeChannel(channel);
       };
     });
