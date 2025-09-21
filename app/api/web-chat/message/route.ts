@@ -8,26 +8,27 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const CONV_COOKIE = "wt_conversation_id";
-const WEB_COOKIE = "wt_web_cookie";
+const WEB_COOKIE  = "wt_web_cookie";
 
-const CONV_COOKIE_MAX_AGE = 60 * 60 * 24 * 14; // 14 days
+const CONV_COOKIE_MAX_AGE = 60 * 60 * 24 * 14;  // 14 days
 const WEB_COOKIE_MAX_AGE  = 60 * 60 * 24 * 365; // 365 days
 
 // Env
-const ORG_SLUG = process.env.ORG_SLUG || "wrc-mn";
+const ORG_SLUG      = process.env.ORG_SLUG || "wrc-mn";
 const OWNER_USER_ID = process.env.WEB_CHAT_OWNER_USER_ID || "";
 
-// Rate-limit debug (non-enforcing; headers only)
-const RL_LIMIT = parseInt(process.env.WEBCHAT_RL_LIMIT ?? "3", 10);
-const RL_WINDOW_SEC = parseInt(process.env.WEBCHAT_RL_WINDOW_SEC ?? "30", 10);
+// Rate-limit config (debug headers + optional enforcement)
+const RL_LIMIT       = parseInt(process.env.WEBCHAT_RL_LIMIT ?? "3", 10);
+const RL_WINDOW_SEC  = parseInt(process.env.WEBCHAT_RL_WINDOW_SEC ?? "30", 10);
+const RL_ENABLED     = (process.env.WEBCHAT_RL_ENABLED ?? "false").toLowerCase() === "true";
 
 // Normalize detector output to a string slug (or null)
 function extractSlug(d: any): string | null {
   if (!d) return null;
   if (typeof d === "string") return d || null;
-  if (typeof (d as any).slug === "string" && (d as any).slug) return (d as any).slug;
-  if (typeof (d as any).speciesSlug === "string" && (d as any).speciesSlug) return (d as any).speciesSlug;
-  if (typeof (d as any).value === "string" && (d as any).value) return (d as any).value;
+  if (typeof d.slug === "string" && d.slug) return d.slug;
+  if (typeof d.speciesSlug === "string" && d.speciesSlug) return d.speciesSlug;
+  if (typeof d.value === "string" && d.value) return d.value;
   if (Array.isArray(d)) {
     for (const v of d) {
       const s = extractSlug(v);
@@ -51,10 +52,7 @@ export async function POST(req: Request) {
     const content = (body?.content ?? "").toString();
 
     if (!content || !content.trim()) {
-      return NextResponse.json(
-        { ok: false, error: "empty_content", stage: "validate" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "empty_content", stage: "validate" }, { status: 400 });
     }
 
     const jar = await cookies();
@@ -73,11 +71,7 @@ export async function POST(req: Request) {
       }
       const { data, error } = await admin
         .from("conversations")
-        .insert({
-          user_id: OWNER_USER_ID,
-          title: "Web Chat",
-          created_ip: source_ip ?? null,
-        })
+        .insert({ user_id: OWNER_USER_ID, title: "Web Chat", created_ip: source_ip ?? null })
         .select("id")
         .single();
 
@@ -92,18 +86,13 @@ export async function POST(req: Request) {
 
     // Keep legacy mapping in sync (cookie + upsert)
     let webCookieId = jar.get(WEB_COOKIE)?.value || null;
-    if (!webCookieId) {
-      webCookieId = crypto.randomUUID();
-    }
+    if (!webCookieId) webCookieId = crypto.randomUUID();
+
     await admin
       .from("web_conversation_cookies")
-      .upsert(
-        { cookie_id: webCookieId, conversation_id: conversationId },
-        { onConflict: "cookie_id" }
-      );
+      .upsert({ cookie_id: webCookieId, conversation_id: conversationId }, { onConflict: "cookie_id" });
 
-    // --- Rate-limit DEBUG (no blocking) --------------------------------------
-    // Count how many USER messages in the last window BEFORE this insert
+    // --- Rate-limit count BEFORE insert (for headers + optional enforcement)
     let countBefore = 0;
     try {
       const cutoffIso = new Date(Date.now() - RL_WINDOW_SEC * 1000).toISOString();
@@ -114,10 +103,21 @@ export async function POST(req: Request) {
         .eq("role", "user")
         .gt("created_at", cutoffIso);
       countBefore = count ?? 0;
-    } catch {
-      // swallow debug failures
+    } catch { /* ignore */ }
+
+    // ENFORCE (optional): if enabled and already at/above limit, 429
+    if (RL_ENABLED && countBefore >= RL_LIMIT) {
+      const res429 = NextResponse.json(
+        { ok: false, error: "rate_limited", stage: "rate_limit" },
+        { status: 429 }
+      );
+      res429.headers.set("x-conversation-id", conversationId);
+      res429.headers.set("x-rate-limit-limit", String(RL_LIMIT));
+      res429.headers.set("x-rate-limit-window-sec", String(RL_WINDOW_SEC));
+      res429.headers.set("x-rate-limit-count-before", String(countBefore));
+      res429.headers.set("x-rate-limit-remaining-after", "0");
+      return res429;
     }
-    // -------------------------------------------------------------------------
 
     // Persist user message
     {
@@ -138,40 +138,20 @@ export async function POST(req: Request) {
     // Species detection + policy resolution
     const detected = await detectSpeciesSlugFromText(content);
     const speciesSlug = extractSlug(detected);
-    const policy = speciesSlug
-      ? await resolvePolicyForSpecies(speciesSlug, ORG_SLUG)
-      : null;
+    const policy = speciesSlug ? await resolvePolicyForSpecies(speciesSlug, ORG_SLUG) : null;
 
     // Build json response
     const res = NextResponse.json(
-      {
-        ok: true,
-        conversation_id: conversationId,
-        speciesSlug, // string | null
-        policy,      // object | null
-        ms: Date.now() - startedAt,
-      },
+      { ok: true, conversation_id: conversationId, speciesSlug, policy, ms: Date.now() - startedAt },
       { status: 200 }
     );
 
     // Set/refresh cookies
     res.cookies.set({
-      name: CONV_COOKIE,
-      value: conversationId,
-      httpOnly: true,
-      sameSite: "lax",
-      secure: true,
-      path: "/",
-      maxAge: CONV_COOKIE_MAX_AGE,
+      name: CONV_COOKIE, value: conversationId, httpOnly: true, sameSite: "lax", secure: true, path: "/", maxAge: CONV_COOKIE_MAX_AGE,
     });
     res.cookies.set({
-      name: WEB_COOKIE,
-      value: webCookieId,
-      httpOnly: true,
-      sameSite: "lax",
-      secure: true,
-      path: "/",
-      maxAge: WEB_COOKIE_MAX_AGE,
+      name: WEB_COOKIE, value: webCookieId, httpOnly: true, sameSite: "lax", secure: true, path: "/", maxAge: WEB_COOKIE_MAX_AGE,
     });
 
     // Debug headers
@@ -182,6 +162,7 @@ export async function POST(req: Request) {
     res.headers.set("x-rate-limit-window-sec", String(RL_WINDOW_SEC));
     res.headers.set("x-rate-limit-count-before", String(countBefore));
     res.headers.set("x-rate-limit-remaining-after", String(remainingAfter));
+    res.headers.set("x-rate-limit-enabled", String(RL_ENABLED));
 
     return res;
   } catch (err: any) {
@@ -194,8 +175,5 @@ export async function POST(req: Request) {
 
 // GET → 405 (intentional; POST-only)
 export async function GET() {
-  return NextResponse.json(
-    { ok: false, error: "method_not_allowed" },
-    { status: 405 }
-  );
+  return NextResponse.json({ ok: false, error: "method_not_allowed" }, { status: 405 });
 }
