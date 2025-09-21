@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import Link from "next/link";
+import RealtimeCasesListListener from "./RealtimeCasesListListener";
+
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -85,6 +87,7 @@ export default async function CasesPage() {
 
   return (
     <main style={{ maxWidth: 900, margin: "32px auto", padding: 24 }}>
+      <RealtimeCasesListListener />
       <h1 style={{ fontSize: 32, fontWeight: 800, color: pageTitle, marginBottom: 4 }}>
         Cases (SMS)
       </h1>
