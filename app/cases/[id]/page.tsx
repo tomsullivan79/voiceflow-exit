@@ -1,10 +1,10 @@
 // app/cases/[id]/page.tsx
-import RealtimeCaseListener from "./RealtimeCaseListener";
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import twilio from "twilio";
 import Link from "next/link";
+import RealtimeCaseListener from "./RealtimeCaseListener";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -244,7 +244,7 @@ export default async function CasePage({ params }: { params: { id: string } }) {
   return (
     <main style={{ maxWidth: 720, margin: "32px auto", padding: 24 }}>
       {/* Realtime: refresh this page whenever a new message is inserted for this conversation */}
-      <RealtimeCaseListener conversationId={conversation.id} />
+      <RefreshDetailClient conversationId={conversationId} />
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>

@@ -87,7 +87,7 @@ export default async function CasesPage() {
 
   return (
     <main style={{ maxWidth: 900, margin: "32px auto", padding: 24 }}>
-      <RealtimeCasesListListener />
+      <RefreshListClient />
       <h1 style={{ fontSize: 32, fontWeight: 800, color: pageTitle, marginBottom: 4 }}>
         Cases (SMS)
       </h1>
