@@ -19,8 +19,10 @@ export default function WebChatPage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [policy, setPolicy] = useState<Policy>(null); // ⬅️ NEW
+  const [policy, setPolicy] = useState<Policy>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const trimmed = input.trim();
 
   // Load prior history + conversation id
   useEffect(() => {
@@ -81,8 +83,8 @@ export default function WebChatPage() {
   }, [conversationId]);
 
   async function onSend() {
-    if (!input.trim() || sending) return;
-    const text = input.trim();
+    if (!trimmed || sending) return;
+    const text = trimmed;
 
     // Optimistic user bubble
     setMessages((m) => [...m, { role: "user", content: text }]);
@@ -105,7 +107,7 @@ export default function WebChatPage() {
         return;
       }
 
-      // NEW: capture policy (if any) for the banner
+      // capture policy (if any) for the banner
       setPolicy(pjson?.policy ?? null);
 
       // If the conversation was just created, keep its id for realtime
@@ -162,6 +164,15 @@ export default function WebChatPage() {
     }
   }
 
+  // Keyboard: Enter to send, Shift+Enter for newline. Still respects empty guard.
+  function onComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (!trimmed || sending) return;
+      void onSend();
+    }
+  }
+
   return (
     <main className="wt-main">
       <div className="wt-wrap">
@@ -207,15 +218,16 @@ export default function WebChatPage() {
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onComposerKeyDown}
             rows={3}
             placeholder="Describe the animal, location, and situation…"
             className="wt-textarea"
           />
           <div className="wt-actions">
-            <button onClick={() => abortRef.current?.abort()} className="wt-btn wt-btn-secondary" disabled={!sending}>
+            <button onClick={() => abortRef.current?.abort()} className="wt-btn wt-btn-secondary" disabled={!sending} aria-disabled={!sending}>
               Cancel
             </button>
-            <button onClick={onSend} className="wt-btn wt-btn-primary" disabled={sending || !input.trim()}>
+            <button onClick={onSend} className="wt-btn wt-btn-primary" disabled={sending || !trimmed} aria-disabled={sending || !trimmed}>
               {sending ? "Sending…" : "Send"}
             </button>
           </div>
@@ -595,4 +607,3 @@ function PolicyBanner({ policy }: { policy: NonNullable<Policy> }) {
     </section>
   );
 }
-
