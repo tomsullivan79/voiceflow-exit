@@ -19,6 +19,7 @@ export default function WebChatPage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [assistantTyping, setAssistantTyping] = useState(false);
   const [policy, setPolicy] = useState<Policy>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -90,6 +91,7 @@ export default function WebChatPage() {
     setMessages((m) => [...m, { role: "user", content: text }]);
     setInput("");
     setSending(true);
+    setAssistantTyping(false); // reset just in case
 
     try {
       // 1) Persist user message (creates conversation if needed) — API returns `policy` if detected
@@ -103,7 +105,7 @@ export default function WebChatPage() {
       if (!persist.ok || pjson?.ok === false) {
         const msg = pjson?.error ? `${pjson.stage ?? "persist"}: ${pjson.error}` : `HTTP ${persist.status}`;
         setMessages((m) => [...m, { role: "assistant", content: `Sorry—saving failed (${msg}).` }]);
-        setPolicy(null); // clear any prior banner on failure
+        setPolicy(null);
         return;
       }
 
@@ -117,6 +119,7 @@ export default function WebChatPage() {
 
       // 2) Get assistant text (browser call)
       abortRef.current = new AbortController();
+      setAssistantTyping(true); // ← show typing indicator while model responds
       const replyRes = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -159,6 +162,7 @@ export default function WebChatPage() {
         { role: "assistant", content: `Sorry—something went wrong: ${err?.message || err}` },
       ]);
     } finally {
+      setAssistantTyping(false); // ← hide typing indicator
       setSending(false);
       abortRef.current = null;
     }
@@ -209,6 +213,29 @@ export default function WebChatPage() {
                   </div>
                 </div>
               ))}
+              {/* Typing indicator */}
+              {assistantTyping && (
+                <div className="wt-row wt-typing">
+                  <picture>
+                    <source media="(prefers-color-scheme: dark)" srcSet="/White_Sage.png" />
+                    <img
+                      src="/Green_Sage.png"
+                      alt="Sage"
+                      width={32}
+                      height={32}
+                      className="wt-avatar wt-avatar-sage"
+                    />
+                  </picture>
+                  <div className="wt-bubble wt-bubble-assistant">
+                    <div className="wt-role">assistant</div>
+                    <div className="wt-typing-dots" aria-live="polite" aria-label="Assistant is typing">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -247,9 +274,7 @@ export default function WebChatPage() {
           --sage-700: #36633C;
           --sage-800: #244228;
           --sage-900: #122114;
-          --sage-primary: #6DAF75; /* voiceflow primary */
-          --text-dark: #0a0a0a;
-          --text-light: #f5f5f5;
+          --sage-primary: #6DAF75;
 
           --blue-50:  #eff6ff;
           --blue-200: #bfdbfe;
@@ -262,63 +287,12 @@ export default function WebChatPage() {
           --emerald-900:#064e3b;
         }
 
-        .wt-main {
-          min-height: 60vh;
-          background: var(--sage-50);
-          color: var(--text-dark);
-        }
+        .wt-main { min-height: 60vh; background: var(--sage-50); color: #0a0a0a; }
         @media (prefers-color-scheme: dark) {
-          .wt-main {
-            background: #0a0a0a;
-            color: var(--text-light);
-          }
+          .wt-main { background: #0a0a0a; color: #f5f5f5; }
         }
 
-        .wt-wrap {
-          max-width: 760px;
-          margin: 0 auto;
-          padding: 24px 16px;
-          font-family: "UCity Pro", ui-sans-serif, system-ui, -apple-system, Segoe UI,
-            Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-        }
-
-        /* --- Policy banner styles --- */
-        .wt-policy {
-          border-radius: 12px;
-          padding: 12px;
-          margin-top: 12px;
-          border: 1px solid;
-        }
-        .wt-policy h4 {
-          margin: 0 0 4px 0;
-          font-size: 14px;
-          font-weight: 700;
-        }
-        .wt-policy p {
-          margin: 0;
-          font-size: 14px;
-          line-height: 1.5;
-          white-space: pre-line;
-        }
-        .wt-referrals {
-          margin-top: 8px;
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-        .wt-ref {
-          font-size: 13px;
-          padding: 6px 10px;
-          border-radius: 10px;
-          background: #fff;
-          border: 1px solid rgba(0,0,0,0.12);
-          text-decoration: none;
-          color: inherit;
-        }
-
-        .wt-policy-blue   { background: var(--blue-50);   border-color: var(--blue-200);   color: var(--blue-900); }
-        .wt-policy-amber  { background: var(--amber-50);  border-color: var(--amber-200);  color: var(--amber-900); }
-        .wt-policy-green  { background: var(--emerald-50);border-color: var(--emerald-200);color: var(--emerald-900); }
+        .wt-wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px; font-family: "UCity Pro", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; }
 
         .wt-card {
           border-radius: 16px;
@@ -329,130 +303,63 @@ export default function WebChatPage() {
           margin-top: 12px;
         }
         @media (prefers-color-scheme: dark) {
-          .wt-card {
-            background: #161616;
-            border-color: rgba(255, 255, 255, 0.08);
-            box-shadow: none;
-          }
+          .wt-card { background: #161616; border-color: rgba(255, 255, 255, 0.08); box-shadow: none; }
         }
 
-        .wt-empty {
-          font-size: 14px;
-          opacity: 0.7;
-          margin: 6px 0;
-        }
+        .wt-empty { font-size: 14px; opacity: 0.7; margin: 6px 0; }
 
-        .wt-list {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .wt-row {
-          display: flex;
-          gap: 10px;
-        }
+        .wt-list { display: flex; flex-direction: column; gap: 12px; }
+        .wt-row { display: flex; gap: 10px; }
 
         .wt-avatar {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          display: grid;
-          place-items: center;
-          background: var(--sage-200);
-          color: #fff;
-          font-weight: 700;
-          flex-shrink: 0;
+          width: 32px; height: 32px; border-radius: 50%;
+          display: grid; place-items: center; background: var(--sage-200);
+          color: #fff; font-weight: 700; flex-shrink: 0;
         }
-        .wt-avatar-user {
-          background: var(--sage-500);
-        }
+        .wt-avatar-user { background: var(--sage-500); }
 
-        .wt-bubble {
-          flex: 1;
-        }
+        .wt-bubble { flex: 1; }
+        .wt-role { text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; opacity: 0.65; margin-bottom: 2px; }
+        .wt-content { white-space: pre-wrap; font-size: 15px; line-height: 1.6; }
 
-        .wt-role {
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          font-size: 11px;
-          opacity: 0.65;
-          margin-bottom: 2px;
+        /* Typing indicator */
+        .wt-typing-dots {
+          display: inline-flex; gap: 6px; padding: 8px 0;
         }
-
-        .wt-content {
-          white-space: pre-wrap;
-          font-size: 15px;
-          line-height: 1.6;
+        .wt-typing-dots span {
+          width: 6px; height: 6px; border-radius: 999px; background: rgba(0,0,0,0.5); display: inline-block;
+          animation: wt-bounce 1.3s infinite ease-in-out both;
+        }
+        .wt-typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .wt-typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes wt-bounce {
+          0%, 80%, 100% { transform: scale(0); }
+          40% { transform: scale(1.0); }
         }
 
         .wt-textarea {
-          width: 100%;
-          resize: vertical;
-          border-radius: 12px;
+          width: 100%; resize: vertical; border-radius: 12px;
           border: 1px solid rgba(0, 0, 0, 0.15);
-          padding: 10px 12px;
-          background: #fff;
-          color: var(--text-dark);
-          font-size: 15px;
-          line-height: 1.5;
-          outline: none;
+          padding: 10px 12px; background: #fff; color: #0a0a0a; font-size: 15px; line-height: 1.5; outline: none;
         }
-        .wt-textarea::placeholder {
-          color: #9ca3af;
-        }
+        .wt-textarea::placeholder { color: #9ca3af; }
 
-        .wt-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 8px;
-          margin-top: 10px;
-        }
-
+        .wt-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
         .wt-btn {
-          border-radius: 12px;
-          padding: 8px 12px;
-          font-size: 14px;
-          border: 1px solid rgba(0, 0, 0, 0.15);
-          background: #f8f9fb;
-          color: #111827;
-          cursor: pointer;
+          border-radius: 12px; padding: 8px 12px; font-size: 14px;
+          border: 1px solid rgba(0, 0, 0, 0.15); background: #f8f9fb; color: #111827; cursor: pointer;
         }
-        .wt-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
+        .wt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .wt-btn-primary {
-          background: var(--sage-primary);
-          color: #ffffff;
-          border-color: var(--sage-primary);
-        }
-        .wt-btn-primary:hover:enabled {
-          filter: brightness(1.05);
-        }
+        .wt-btn-primary { background: var(--sage-primary); color: #ffffff; border-color: var(--sage-primary); }
+        .wt-btn-primary:hover:enabled { filter: brightness(1.05); }
 
-        .wt-btn-secondary {
-          background: #fff;
-        }
+        .wt-btn-secondary { background: #fff; }
         @media (prefers-color-scheme: dark) {
-          .wt-textarea {
-            background: #111;
-            color: var(--text-light);
-            border-color: rgba(255, 255, 255, 0.15);
-          }
-          .wt-btn {
-            background: #1e1e1e;
-            color: #e5e7eb;
-            border-color: rgba(255, 255, 255, 0.15);
-          }
-          .wt-btn-primary {
-            background: var(--sage-500);
-            border-color: var(--sage-500);
-          }
-          .wt-btn-secondary {
-            background: #161616;
-          }
+          .wt-textarea { background: #111; color: #f5f5f5; border-color: rgba(255, 255, 255, 0.15); }
+          .wt-btn { background: #1e1e1e; color: #e5e7eb; border-color: rgba(255, 255, 255, 0.15); }
+          .wt-btn-primary { background: var(--sage-500); border-color: var(--sage-500); }
+          .wt-btn-secondary { background: #161616; }
         }
       `}</style>
     </main>
@@ -513,96 +420,28 @@ function PolicyBanner({ policy }: { policy: NonNullable<Policy> }) {
       </div>
 
       <style jsx>{`
-        /* Card shell already provided by wt-card, we just customize */
-        .wt-policy {
-          display: grid;
-          grid-template-columns: 6px 1fr;
-          gap: 12px;
-          padding: 14px;
-          align-items: start;
-          border-radius: 14px;
-          border: 1px solid rgba(0,0,0,0.08);
-          background: #fff;
-        }
-        @media (prefers-color-scheme: dark) {
-          .wt-policy {
-            background: #161616;
-            border-color: rgba(255,255,255,0.14);
-          }
-        }
-
-        .wt-policy-accent {
-          width: 6px;
-          border-radius: 8px;
-        }
-
+        .wt-policy { display: grid; grid-template-columns: 6px 1fr; gap: 12px; padding: 14px; align-items: start; border-radius: 14px; border: 1px solid rgba(0,0,0,0.08); background: #fff; }
+        @media (prefers-color-scheme: dark) { .wt-policy { background: #161616; border-color: rgba(255,255,255,0.14); } }
+        .wt-policy-accent { width: 6px; border-radius: 8px; }
         .wt-policy-body { display: grid; gap: 8px; }
-
-        .wt-policy-head {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .wt-policy h4 {
-          margin: 0;
-          font-size: 15px;
-          font-weight: 700;
-        }
-
-        .wt-policy-text {
-          margin: 0;
-          font-size: 14px;
-          line-height: 1.55;
-          white-space: pre-line;
-          opacity: 0.95;
-        }
-
-        .wt-pill {
-          font-size: 12px;
-          line-height: 1;
-          padding: 6px 8px;
-          border-radius: 999px;
-          border: 1px solid transparent;
-          font-weight: 600;
-        }
-
-        /* Tones: info (out_of_scope), warn (not_supported), ok (conditional/accept) */
+        .wt-policy-head { display: flex; align-items: center; gap: 8px; }
+        .wt-policy h4 { margin: 0; font-size: 15px; font-weight: 700; }
+        .wt-policy-text { margin: 0; font-size: 14px; line-height: 1.55; white-space: pre-line; opacity: 0.95; }
+        .wt-pill { font-size: 12px; line-height: 1; padding: 6px 8px; border-radius: 999px; border: 1px solid transparent; font-weight: 600; }
         .wt-policy-info  .wt-policy-accent { background: #93c5fd; } /* blue-300 */
         .wt-policy-warn  .wt-policy-accent { background: #fcd34d; } /* amber-300 */
         .wt-policy-ok    .wt-policy-accent { background: #86efac; } /* green-300 */
-
         .wt-pill-info { background: #eff6ff; border-color: #bfdbfe; color: #1e3a8a; }
         .wt-pill-warn { background: #fffbeb; border-color: #fde68a; color: #78350f; }
         .wt-pill-ok   { background: #ecfdf5; border-color: #a7f3d0; color: #064e3b; }
-
         @media (prefers-color-scheme: dark) {
           .wt-pill-info { background: rgba(147,197,253,0.15); border-color: rgba(191,219,254,0.35); color: #93c5fd; }
           .wt-pill-warn { background: rgba(252,211,77,0.15); border-color: rgba(253,230,138,0.35); color: #fcd34d; }
           .wt-pill-ok   { background: rgba(134,239,172,0.15); border-color: rgba(167,243,208,0.35); color: #86efac; }
         }
-
-        .wt-referrals {
-          margin-top: 2px;
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-        .wt-ref {
-          font-size: 13px;
-          padding: 6px 10px;
-          border-radius: 10px;
-          background: #fff;
-          border: 1px solid rgba(0,0,0,0.12);
-          text-decoration: none;
-          color: inherit;
-        }
-        @media (prefers-color-scheme: dark) {
-          .wt-ref {
-            background: #1b1b1b;
-            border-color: rgba(255,255,255,0.12);
-          }
-        }
+        .wt-referrals { margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .wt-ref { font-size: 13px; padding: 6px 10px; border-radius: 10px; background: #fff; border: 1px solid rgba(0,0,0,0.12); text-decoration: none; color: inherit; }
+        @media (prefers-color-scheme: dark) { .wt-ref { background: #1b1b1b; border-color: rgba(255,255,255,0.12); } }
       `}</style>
     </section>
   );
