@@ -10,14 +10,16 @@ export const dynamic = "force-dynamic";
 const CONV_COOKIE = "wt_conversation_id";
 const WEB_COOKIE = "wt_web_cookie";
 
-// Conversation cookie: 14 days is fine (session continuity)
 const CONV_COOKIE_MAX_AGE = 60 * 60 * 24 * 14; // 14 days
-// Web cookie (anonymous visitor id) can be longer-lived
-const WEB_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 365 days
+const WEB_COOKIE_MAX_AGE  = 60 * 60 * 24 * 365; // 365 days
 
-// Environment
+// Env
 const ORG_SLUG = process.env.ORG_SLUG || "wrc-mn";
 const OWNER_USER_ID = process.env.WEB_CHAT_OWNER_USER_ID || "";
+
+// Rate-limit debug (non-enforcing; headers only)
+const RL_LIMIT = parseInt(process.env.WEBCHAT_RL_LIMIT ?? "3", 10);
+const RL_WINDOW_SEC = parseInt(process.env.WEBCHAT_RL_WINDOW_SEC ?? "30", 10);
 
 // Normalize detector output to a string slug (or null)
 function extractSlug(d: any): string | null {
@@ -35,7 +37,6 @@ function extractSlug(d: any): string | null {
   return null;
 }
 
-// Best-effort IP (for auditing)
 function getSourceIp(req: Request): string | null {
   const xf = req.headers.get("x-forwarded-for");
   if (xf) return xf.split(",")[0]?.trim() || null;
@@ -56,13 +57,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // --- (Optional) rate-limit hook here if/when re-enabled ---
-
     const jar = await cookies();
     const source_ip = getSourceIp(req);
     const admin = supabaseAdmin();
 
-    // Read/create conversation id
+    // Conversation id (create if needed)
     let conversationId = jar.get(CONV_COOKIE)?.value || null;
 
     if (!conversationId) {
@@ -91,26 +90,34 @@ export async function POST(req: Request) {
       conversationId = data.id as string;
     }
 
-    // 🔁 NEW: Ensure legacy mapping cookie + row stay in sync
+    // Keep legacy mapping in sync (cookie + upsert)
     let webCookieId = jar.get(WEB_COOKIE)?.value || null;
     if (!webCookieId) {
-      // Create a fresh anonymous cookie id
       webCookieId = crypto.randomUUID();
     }
+    await admin
+      .from("web_conversation_cookies")
+      .upsert(
+        { cookie_id: webCookieId, conversation_id: conversationId },
+        { onConflict: "cookie_id" }
+      );
 
-    // Upsert mapping row (cookie_id is PK)
-    {
-      const { error: mapErr } = await admin
-        .from("web_conversation_cookies")
-        .upsert(
-          { cookie_id: webCookieId, conversation_id: conversationId },
-          { onConflict: "cookie_id" }
-        );
-      if (mapErr) {
-        // Non-fatal: mapping is a convenience for legacy paths, but log by returning header
-        // We still continue, since /chat uses wt_conversation_id primarily.
-      }
+    // --- Rate-limit DEBUG (no blocking) --------------------------------------
+    // Count how many USER messages in the last window BEFORE this insert
+    let countBefore = 0;
+    try {
+      const cutoffIso = new Date(Date.now() - RL_WINDOW_SEC * 1000).toISOString();
+      const { count } = await admin
+        .from("conversation_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("conversation_id", conversationId)
+        .eq("role", "user")
+        .gt("created_at", cutoffIso);
+      countBefore = count ?? 0;
+    } catch {
+      // swallow debug failures
     }
+    // -------------------------------------------------------------------------
 
     // Persist user message
     {
@@ -128,14 +135,14 @@ export async function POST(req: Request) {
       }
     }
 
-    // Species detection + policy resolution (normalized)
+    // Species detection + policy resolution
     const detected = await detectSpeciesSlugFromText(content);
     const speciesSlug = extractSlug(detected);
     const policy = speciesSlug
       ? await resolvePolicyForSpecies(speciesSlug, ORG_SLUG)
       : null;
 
-    // Build response
+    // Build json response
     const res = NextResponse.json(
       {
         ok: true,
@@ -147,7 +154,7 @@ export async function POST(req: Request) {
       { status: 200 }
     );
 
-    // Set/refresh conversation cookie
+    // Set/refresh cookies
     res.cookies.set({
       name: CONV_COOKIE,
       value: conversationId,
@@ -157,8 +164,6 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: CONV_COOKIE_MAX_AGE,
     });
-
-    // Set/refresh web cookie (anon id)
     res.cookies.set({
       name: WEB_COOKIE,
       value: webCookieId,
@@ -169,8 +174,14 @@ export async function POST(req: Request) {
       maxAge: WEB_COOKIE_MAX_AGE,
     });
 
-    // Debug header
+    // Debug headers
+    const remainingAfter = Math.max(0, RL_LIMIT - (countBefore + 1));
     res.headers.set("x-policy-debug", `species=${speciesSlug ?? "null"}`);
+    res.headers.set("x-conversation-id", conversationId);
+    res.headers.set("x-rate-limit-limit", String(RL_LIMIT));
+    res.headers.set("x-rate-limit-window-sec", String(RL_WINDOW_SEC));
+    res.headers.set("x-rate-limit-count-before", String(countBefore));
+    res.headers.set("x-rate-limit-remaining-after", String(remainingAfter));
 
     return res;
   } catch (err: any) {
@@ -181,7 +192,7 @@ export async function POST(req: Request) {
   }
 }
 
-// GET → 405 (intentional; this endpoint is POST-only)
+// GET → 405 (intentional; POST-only)
 export async function GET() {
   return NextResponse.json(
     { ok: false, error: "method_not_allowed" },
