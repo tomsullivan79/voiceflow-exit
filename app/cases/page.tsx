@@ -1,178 +1,92 @@
 // app/cases/page.tsx
-import "server-only";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
-import { createServerClient } from "@supabase/ssr";
 import Link from "next/link";
-import RealtimeCasesListListener from "./RealtimeCasesListListener";
-
+import { supabaseAdmin } from "../../lib/supabaseServer";
+import RefreshListClient from "./RefreshListClient";
 
 export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
-function getEnv() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const service = process.env.SUPABASE_SERVICE_ROLE;
-  if (!url || !anon || !service) throw new Error("Missing Supabase env vars.");
-  return { url, anon, service };
-}
+type ConversationRow = {
+  id: string;
+  title: string | null;
+  created_at: string;
+  closed_at: string | null;
+};
 
-async function requireSession(url: string, anon: string) {
-  const cookieStore = cookies();
-  const supabase = createServerClient(url, anon, {
-    cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
-      },
-      // no-ops to avoid Next “Cookies can only be modified…” error
-      set() {},
-      remove() {},
-    },
-  });
-  const { data } = await supabase.auth.getUser();
-  if (!data?.user) redirect("/auth");
-}
-
-function getAdminClient(url: string, service: string) {
-  return createClient(url, service, { auth: { persistSession: false } });
-}
-
-type ConversationRow = Record<string, any>;
-
-async function fetchConversations(url: string, service: string) {
-  const supabase = getAdminClient(url, service);
-  const { data, error } = await supabase
+async function getConversations(): Promise<ConversationRow[]> {
+  const admin = supabaseAdmin();
+  const { data, error } = await admin
     .from("conversations")
-    .select("*") // avoid referencing columns that may not exist
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data || []) as ConversationRow[];
-}
-
-function StatusBadge({ closed_at }: { closed_at: string | null }) {
-  const isClosed = !!closed_at;
-  const bg = isClosed ? "#fee2e2" : "#d1fae5";
-  const fg = isClosed ? "#991b1b" : "#065f46";
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "2px 8px",
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 700,
-        background: bg,
-        color: fg,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {isClosed ? "Closed" : "Open"}
-    </span>
-  );
+    .select("id, title, created_at, closed_at")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) throw new Error(`conversations_select_failed: ${error.message}`);
+  return (data ?? []) as ConversationRow[];
 }
 
 export default async function CasesPage() {
-  const { url, anon, service } = getEnv();
-  await requireSession(url, anon);
-  const cases = await fetchConversations(url, service);
-
-  // palette
-  const pageTitle = "#f9fafb";
-  const pageSub = "#cbd5e1";
-  const cardText = "#111827";
-  const subtle = "#6b7280";
-  const border = "#d1d5db";
+  const rows = await getConversations();
 
   return (
-    <main style={{ maxWidth: 900, margin: "32px auto", padding: 24 }}>
+    <main className="wt-main">
+      {/* Client bridge for realtime list refresh */}
       <RefreshListClient />
-      <h1 style={{ fontSize: 32, fontWeight: 800, color: pageTitle, marginBottom: 4 }}>
-        Cases (SMS)
-      </h1>
-      <p style={{ color: pageSub, marginBottom: 16 }}>
-        Click a case to view messages and delivery status.
-      </p>
 
-      <div style={{ display: "grid", gap: 12 }}>
-        {cases.map((c) => {
-          const phone =
-            c.participant_phone ??
-            c.phone ??
-            c.msisdn ??
-            c.from_number ??
-            c.to_number ??
-            null;
+      <div className="wt-wrap">
+        <header className="wt-header">
+          <h1>Cases</h1>
+          <p className="wt-sub">Newest first. This list live-updates on new activity.</p>
+        </header>
 
-          return (
-            <div
-              key={c.id}
-              style={{
-                border: `1px solid ${border}`,
-                background: "#ffffff",
-                color: cardText,
-                borderRadius: 8,
-                padding: 14,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                }}
-              >
-                <Link
-                  href={`/cases/${c.id}`}
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 700,
-                    color: "#1e40af",
-                    textDecoration: "underline",
-                  }}
-                >
-                  {c.title || c.id}
-                </Link>
-                <StatusBadge closed_at={c.closed_at ?? null} />
-              </div>
-
-              <div
-                style={{
-                  marginTop: 6,
-                  color: subtle,
-                  fontSize: 14,
-                  display: "flex",
-                  gap: 8,
-                  flexWrap: "wrap",
-                }}
-              >
-                <span>{phone || "—"}</span>
-                <span>•</span>
-                <span>
-                  {(c.closed_at ? "closed" : "open") + " • "}{new Date(c.created_at).toLocaleString()}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-
-        {cases.length === 0 ? (
-          <div
-            style={{
-              border: `1px solid ${border}`,
-              background: "#ffffff",
-              color: subtle,
-              borderRadius: 8,
-              padding: 16,
-              textAlign: "center",
-            }}
-          >
-            No cases yet.
-          </div>
-        ) : null}
+        <section className="wt-list">
+          {rows.length === 0 ? (
+            <div className="wt-card">No cases yet.</div>
+          ) : (
+            rows.map((c) => (
+              <Link key={c.id} href={`/cases/${c.id}`} className="wt-card wt-case">
+                <div className="wt-row">
+                  <div className="wt-title">{c.title || "Untitled Case"}</div>
+                  <div className={`wt-badge ${c.closed_at ? "wt-badge-closed" : "wt-badge-open"}`}>
+                    {c.closed_at ? "Closed" : "Open"}
+                  </div>
+                </div>
+                <div className="wt-meta">
+                  <span>Created: {new Date(c.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}</span>
+                  {c.closed_at && (
+                    <span> • Closed: {new Date(c.closed_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}</span>
+                  )}
+                </div>
+              </Link>
+            ))
+          )}
+        </section>
       </div>
+
+      <style jsx>{`
+        .wt-main { min-height: 60vh; }
+        .wt-wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+        .wt-header h1 { margin: 0; font-size: 24px; }
+        .wt-sub { margin: 6px 0 12px; opacity: 0.7; }
+        .wt-list { display: grid; gap: 12px; }
+        .wt-card {
+          border-radius: 16px; padding: 14px; border: 1px solid rgba(0,0,0,0.08); background: #fff;
+        }
+        @media (prefers-color-scheme: dark) {
+          .wt-card { background: #161616; border-color: rgba(255,255,255,0.12); }
+        }
+        .wt-case { text-decoration: none; color: inherit; display: block; }
+        .wt-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        .wt-title { font-weight: 700; }
+        .wt-meta { margin-top: 6px; font-size: 12px; opacity: 0.75; }
+        .wt-badge {
+          padding: 4px 8px; border-radius: 999px; font-size: 12px; border: 1px solid transparent;
+        }
+        .wt-badge-open { background: #e8f5e9; border-color: #c8e6c9; color: #1b5e20; }
+        .wt-badge-closed { background: #fff7ed; border-color: #ffedd5; color: #9a3412; }
+        @media (prefers-color-scheme: dark) {
+          .wt-badge-open { background: rgba(76,175,80,0.15); border-color: rgba(200,230,201,0.35); color: #9ae6b4; }
+          .wt-badge-closed { background: rgba(253,186,116,0.15); border-color: rgba(254,215,170,0.35); color: #fbbf24; }
+        }
+      `}</style>
     </main>
   );
 }
