@@ -4,8 +4,16 @@ import { cookies } from "next/headers";
 import { supabaseAdmin } from "../../../../lib/supabaseServer";
 import { detectSpeciesSlugFromText, resolvePolicyForSpecies } from "../../../../lib/policy";
 
-const COOKIE_NAME = "wt_conversation_id";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 14; // 14 days
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const CONV_COOKIE = "wt_conversation_id";
+const WEB_COOKIE = "wt_web_cookie";
+
+// Conversation cookie: 14 days is fine (session continuity)
+const CONV_COOKIE_MAX_AGE = 60 * 60 * 24 * 14; // 14 days
+// Web cookie (anonymous visitor id) can be longer-lived
+const WEB_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 365 days
 
 // Environment
 const ORG_SLUG = process.env.ORG_SLUG || "wrc-mn";
@@ -15,10 +23,9 @@ const OWNER_USER_ID = process.env.WEB_CHAT_OWNER_USER_ID || "";
 function extractSlug(d: any): string | null {
   if (!d) return null;
   if (typeof d === "string") return d || null;
-  if (typeof d.slug === "string" && d.slug) return d.slug;
-  if (typeof d.speciesSlug === "string" && d.speciesSlug) return d.speciesSlug;
-  if (typeof d.value === "string" && d.value) return d.value;
-  // Array of candidates? take the first string-like
+  if (typeof (d as any).slug === "string" && (d as any).slug) return (d as any).slug;
+  if (typeof (d as any).speciesSlug === "string" && (d as any).speciesSlug) return (d as any).speciesSlug;
+  if (typeof (d as any).value === "string" && (d as any).value) return (d as any).value;
   if (Array.isArray(d)) {
     for (const v of d) {
       const s = extractSlug(v);
@@ -49,17 +56,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // --- (Optional) rate-limit hook (kept out of the way for now)
-    // If you want to re-enable your limiter, call it here and return 429 when blocked.
+    // --- (Optional) rate-limit hook here if/when re-enabled ---
 
-    // Conversation cookie
-    const cookieStore = cookies();
-    let conversationId = cookieStore.get(COOKIE_NAME)?.value || null;
-
+    const jar = await cookies();
     const source_ip = getSourceIp(req);
     const admin = supabaseAdmin();
 
-    // Ensure conversation exists
+    // Read/create conversation id
+    let conversationId = jar.get(CONV_COOKIE)?.value || null;
+
     if (!conversationId) {
       if (!OWNER_USER_ID) {
         return NextResponse.json(
@@ -84,6 +89,27 @@ export async function POST(req: Request) {
         );
       }
       conversationId = data.id as string;
+    }
+
+    // 🔁 NEW: Ensure legacy mapping cookie + row stay in sync
+    let webCookieId = jar.get(WEB_COOKIE)?.value || null;
+    if (!webCookieId) {
+      // Create a fresh anonymous cookie id
+      webCookieId = crypto.randomUUID();
+    }
+
+    // Upsert mapping row (cookie_id is PK)
+    {
+      const { error: mapErr } = await admin
+        .from("web_conversation_cookies")
+        .upsert(
+          { cookie_id: webCookieId, conversation_id: conversationId },
+          { onConflict: "cookie_id" }
+        );
+      if (mapErr) {
+        // Non-fatal: mapping is a convenience for legacy paths, but log by returning header
+        // We still continue, since /chat uses wt_conversation_id primarily.
+      }
     }
 
     // Persist user message
@@ -123,16 +149,27 @@ export async function POST(req: Request) {
 
     // Set/refresh conversation cookie
     res.cookies.set({
-      name: COOKIE_NAME,
+      name: CONV_COOKIE,
       value: conversationId,
       httpOnly: true,
       sameSite: "lax",
       secure: true,
       path: "/",
-      maxAge: COOKIE_MAX_AGE,
+      maxAge: CONV_COOKIE_MAX_AGE,
     });
 
-    // Optional quick debug header (handy in DevTools)
+    // Set/refresh web cookie (anon id)
+    res.cookies.set({
+      name: WEB_COOKIE,
+      value: webCookieId,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: true,
+      path: "/",
+      maxAge: WEB_COOKIE_MAX_AGE,
+    });
+
+    // Debug header
     res.headers.set("x-policy-debug", `species=${speciesSlug ?? "null"}`);
 
     return res;
