@@ -2,14 +2,13 @@
 import { NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabaseServer";
-import { ORG_SLUG } from "@/lib/config";
 import { detectSpeciesSlugFromText, resolvePolicyForSpecies } from "@/lib/policy";
 
 const MAX_MSGS = 3;
 const WINDOW_SEC = 30;
 
-// normalize small things for duplicate protection
-const norm = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
+// Read org slug from env (prod has ORG_SLUG=wrc-mn)
+const ORG_SLUG = process.env.ORG_SLUG || process.env.NEXT_PUBLIC_ORG_SLUG || "wrc-mn";
 
 export async function POST(req: Request) {
   const started = Date.now();
@@ -29,7 +28,7 @@ export async function POST(req: Request) {
       h.get("x-real-ip") ||
       "0.0.0.0";
 
-    // Conversation cookie (your existing flow should set/return this id)
+    // Conversation cookie (reused if present)
     const jar = cookies();
     const convId = jar.get("wt_conversation_id")?.value ?? body?.conversation_id ?? null;
 
@@ -45,7 +44,6 @@ export async function POST(req: Request) {
         .gte("created_at", sinceIso);
 
       if (cErr) {
-        // soft-fail: don't block the user if count query errors
         console.warn("[rate] count error:", cErr.message);
       } else if ((count ?? 0) >= MAX_MSGS) {
         return tooMany();
@@ -55,7 +53,7 @@ export async function POST(req: Request) {
       const { count, error: cErr } = await supabase
         .from("conversation_messages")
         .select("id", { count: "exact", head: true })
-        .eq("source_ip", ip) // requires nullable column; if you don't have it yet, see note below
+        .eq("source_ip", ip) // safe if you ran the optional SQL to add this column
         .eq("role", "user")
         .gte("created_at", sinceIso);
 
@@ -66,8 +64,6 @@ export async function POST(req: Request) {
     // -------------------------------------------------------------------------------
 
     // Create conversation (if needed) & persist user message
-    // NOTE: this assumes your existing implementation; keep your current logic here.
-    // Minimal example (adapt to your code):
     const conversation_id = await ensureConversationId(convId, supabase, jar, ip);
 
     const { data: insertMsg, error: insErr } = await supabase
@@ -76,8 +72,8 @@ export async function POST(req: Request) {
         conversation_id,
         role: "user",
         content,
-        source: "web",
-        source_ip: ip, // safe to set; if column doesn't exist, remove this line
+        source: "web", // remove this line if your table doesn't have 'source'
+        source_ip: ip,  // remove if you didn't add this column
       })
       .select("id")
       .maybeSingle();
@@ -88,12 +84,11 @@ export async function POST(req: Request) {
 
     // Policy detection
     const speciesSlug = detectSpeciesSlugFromText(content);
-    let policy = null as any;
+    let policy: any = null;
     if (speciesSlug) {
       policy = await resolvePolicyForSpecies(speciesSlug, ORG_SLUG);
     }
 
-    // Done
     return NextResponse.json(
       { ok: true, conversation_id, speciesSlug, policy, ms: Date.now() - started },
       { status: 200 }
@@ -132,13 +127,13 @@ async function ensureConversationId(
   // Minimal insert — only fields we know exist.
   const { data, error } = await supabase
     .from("conversations")
-    .insert({ title: null, created_ip: ip }) // ← removed `source`
+    .insert({ title: null, created_ip: ip }) // no 'source' here
     .select("id")
     .maybeSingle();
 
   if (error || !data?.id) throw new Error(error?.message || "conv-create-failed");
 
-  // Persist cookie for subsequent requests
+  // Set cookie so subsequent messages reuse this conversation
   jar.set("wt_conversation_id", data.id, {
     httpOnly: true,
     sameSite: "lax",
@@ -149,4 +144,3 @@ async function ensureConversationId(
 
   return data.id;
 }
-
