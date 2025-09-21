@@ -21,6 +21,7 @@ export default function RealtimeCasesListListener({
 
     const channel = supa
       .channel("cases-list")
+      // New messages (existing cases)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "conversation_messages" },
@@ -28,15 +29,21 @@ export default function RealtimeCasesListListener({
           if (!cancelled) onChange?.();
         }
       )
+      // New/updated conversations (new cases or title changes, status flips)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversations" },
+        () => {
+          if (!cancelled) onChange?.();
+        }
+      )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          // stop any polling fallback managed by parent
-          onHeartbeatStop?.();
-          // console.debug("[cases-rt] channel status:", status);
+          onHeartbeatStop?.(); // parent should stop any polling fallback
         }
       });
 
-    // Optional polling heartbeat while subscribing/if dropped
+    // Polling fallback while subscribing / on disconnects
     let timer: NodeJS.Timeout | null = null;
     const startHeartbeat = () => {
       if (timer) return;
@@ -46,12 +53,12 @@ export default function RealtimeCasesListListener({
       }, 15000);
     };
     const stopHeartbeat = () => {
-      if (timer) clearInterval(timer);
+      if (!timer) return;
+      clearInterval(timer);
       timer = null;
       onHeartbeatStop?.();
     };
 
-    // Start heartbeat until SUBSCRIBED fires (parent should stop it there)
     startHeartbeat();
 
     return () => {

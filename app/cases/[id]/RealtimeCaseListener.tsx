@@ -32,15 +32,13 @@ export default function RealtimeCaseListener({ conversationId, onChange, onHeart
         }
       )
       .subscribe(async (status) => {
-        // console.debug("[case-rt] channel status:", status);
-        if (status === "SUBSCRIBED") {
-          try {
-            const res = await fetch("/api/cases/heartbeat");
-            const txt = await res.text();
-            onHeartbeat?.(`[case-rt] heartbeat change detected: ${txt.slice(0, 80)}`);
-          } catch {
-            onHeartbeat?.("[case-rt] heartbeat error");
-          }
+        // Optional heartbeat to poke ISR/cache or just log liveness
+        try {
+          const res = await fetch(`/api/cases/heartbeat?conversation_id=${encodeURIComponent(conversationId)}`);
+          const txt = await res.text();
+          onHeartbeat?.(`[case-rt:${status}] ${txt.slice(0, 80)}`);
+        } catch {
+          onHeartbeat?.(`[case-rt:${status}] heartbeat fetch failed`);
         }
       });
 
