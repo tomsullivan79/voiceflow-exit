@@ -1,151 +1,153 @@
 // app/api/web-chat/message/route.ts
 import { NextResponse } from "next/server";
-import { cookies, headers } from "next/headers";
-import { supabaseAdmin } from "@/lib/supabaseServer";
-import { detectSpeciesSlugFromText, resolvePolicyForSpecies } from "@/lib/policy";
+import { cookies } from "next/headers";
+import { supabaseAdmin } from "../../../../lib/supabaseServer";
+import { detectSpeciesSlugFromText, resolvePolicyForSpecies } from "../../../../lib/policy";
 
-const MAX_MSGS = 3;
-const WINDOW_SEC = 30;
+const COOKIE_NAME = "wt_conversation_id";
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 14; // 14 days
 
-// Read org slug from env (prod has ORG_SLUG=wrc-mn)
-const ORG_SLUG = process.env.ORG_SLUG || process.env.NEXT_PUBLIC_ORG_SLUG || "wrc-mn";
+// Environment
+const ORG_SLUG = process.env.ORG_SLUG || "wrc-mn";
+const OWNER_USER_ID = process.env.WEB_CHAT_OWNER_USER_ID || "";
+
+// Normalize detector output to a string slug (or null)
+function extractSlug(d: any): string | null {
+  if (!d) return null;
+  if (typeof d === "string") return d || null;
+  if (typeof d.slug === "string" && d.slug) return d.slug;
+  if (typeof d.speciesSlug === "string" && d.speciesSlug) return d.speciesSlug;
+  if (typeof d.value === "string" && d.value) return d.value;
+  // Array of candidates? take the first string-like
+  if (Array.isArray(d)) {
+    for (const v of d) {
+      const s = extractSlug(v);
+      if (s) return s;
+    }
+  }
+  return null;
+}
+
+// Best-effort IP (for auditing)
+function getSourceIp(req: Request): string | null {
+  const xf = req.headers.get("x-forwarded-for");
+  if (xf) return xf.split(",")[0]?.trim() || null;
+  return req.headers.get("x-real-ip") || null;
+}
 
 export async function POST(req: Request) {
-  const started = Date.now();
+  const startedAt = Date.now();
+
   try {
-    const supabase = supabaseAdmin();
-    const body = await req.json();
-    const content: string = String(body?.content ?? "");
+    const body = await req.json().catch(() => null);
+    const content = (body?.content ?? "").toString();
 
-    if (!content.trim()) {
-      return NextResponse.json({ ok: false, error: "empty" }, { status: 400 });
+    if (!content || !content.trim()) {
+      return NextResponse.json(
+        { ok: false, error: "empty_content", stage: "validate" },
+        { status: 400 }
+      );
     }
 
-    // Identify browser/IP (used only before a conversation_id exists)
-    const h = headers();
-    const ip =
-      h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      h.get("x-real-ip") ||
-      "0.0.0.0";
+    // --- (Optional) rate-limit hook (kept out of the way for now)
+    // If you want to re-enable your limiter, call it here and return 429 when blocked.
 
-    // Conversation cookie (reused if present)
-    const jar = cookies();
-    const convId = jar.get("wt_conversation_id")?.value ?? body?.conversation_id ?? null;
+    // Conversation cookie
+    const cookieStore = cookies();
+    let conversationId = cookieStore.get(COOKIE_NAME)?.value || null;
 
-    // --- RATE LIMIT: 3 user msgs / 30s per conversation (or per IP if no conv yet) ---
-    const sinceIso = new Date(Date.now() - WINDOW_SEC * 1000).toISOString();
+    const source_ip = getSourceIp(req);
+    const admin = supabaseAdmin();
 
-    if (convId) {
-      const { count, error: cErr } = await supabase
-        .from("conversation_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("conversation_id", convId)
-        .eq("role", "user")
-        .gte("created_at", sinceIso);
-
-      if (cErr) {
-        console.warn("[rate] count error:", cErr.message);
-      } else if ((count ?? 0) >= MAX_MSGS) {
-        return tooMany();
+    // Ensure conversation exists
+    if (!conversationId) {
+      if (!OWNER_USER_ID) {
+        return NextResponse.json(
+          { ok: false, error: "missing_OWNER_USER_ID_env", stage: "ensureConversation" },
+          { status: 500 }
+        );
       }
-    } else {
-      // no conversation yet → approximate per-IP rate
-      const { count, error: cErr } = await supabase
-        .from("conversation_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("source_ip", ip) // safe if you ran the optional SQL to add this column
-        .eq("role", "user")
-        .gte("created_at", sinceIso);
+      const { data, error } = await admin
+        .from("conversations")
+        .insert({
+          user_id: OWNER_USER_ID,
+          title: "Web Chat",
+          created_ip: source_ip ?? null,
+        })
+        .select("id")
+        .single();
 
-      if (!cErr && (count ?? 0) >= MAX_MSGS) {
-        return tooMany();
+      if (error || !data?.id) {
+        return NextResponse.json(
+          { ok: false, error: error?.message || "conversation_insert_failed", stage: "ensureConversation" },
+          { status: 500 }
+        );
       }
+      conversationId = data.id as string;
     }
-    // -------------------------------------------------------------------------------
 
-    // Create conversation (if needed) & persist user message
-    const conversation_id = await ensureConversationId(convId, supabase, jar, ip);
-
-    const { data: insertMsg, error: insErr } = await supabase
-      .from("conversation_messages")
-      .insert({
-        conversation_id,
+    // Persist user message
+    {
+      const { error } = await admin.from("conversation_messages").insert({
+        conversation_id: conversationId,
         role: "user",
         content,
-        source_ip: ip, // if you *didn’t* add this column, you can remove this line too
-      })
-      .select("id")
-      .maybeSingle();
-
-    if (insErr) {
-      return NextResponse.json({ ok: false, stage: "insert", error: insErr.message }, { status: 500 });
+        source_ip: source_ip ?? null,
+      });
+      if (error) {
+        return NextResponse.json(
+          { ok: false, error: error.message, stage: "persist_user" },
+          { status: 500 }
+        );
+      }
     }
 
-    // Policy detection
-    const speciesSlug = detectSpeciesSlugFromText(content);
-    let policy: any = null;
-    if (speciesSlug) {
-      policy = await resolvePolicyForSpecies(speciesSlug, ORG_SLUG);
-    }
+    // Species detection + policy resolution (normalized)
+    const detected = await detectSpeciesSlugFromText(content);
+    const speciesSlug = extractSlug(detected);
+    const policy = speciesSlug
+      ? await resolvePolicyForSpecies(speciesSlug, ORG_SLUG)
+      : null;
 
-    return NextResponse.json(
-      { ok: true, conversation_id, speciesSlug, policy, ms: Date.now() - started },
+    // Build response
+    const res = NextResponse.json(
+      {
+        ok: true,
+        conversation_id: conversationId,
+        speciesSlug, // string | null
+        policy,      // object | null
+        ms: Date.now() - startedAt,
+      },
       { status: 200 }
     );
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || "unknown" }, { status: 500 });
+
+    // Set/refresh conversation cookie
+    res.cookies.set({
+      name: COOKIE_NAME,
+      value: conversationId,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: true,
+      path: "/",
+      maxAge: COOKIE_MAX_AGE,
+    });
+
+    // Optional quick debug header (handy in DevTools)
+    res.headers.set("x-policy-debug", `species=${speciesSlug ?? "null"}`);
+
+    return res;
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: err?.message || String(err), stage: "unhandled" },
+      { status: 500 }
+    );
   }
 }
 
-function tooMany() {
-  return new NextResponse(
-    JSON.stringify({
-      ok: false,
-      error: "rate_limited",
-      message: `Too many messages — please wait a moment and try again.`,
-      retry_after_sec: WINDOW_SEC,
-    }),
-    {
-      status: 429,
-      headers: {
-        "Content-Type": "application/json",
-        "Retry-After": String(WINDOW_SEC),
-      },
-    }
+// GET → 405 (intentional; this endpoint is POST-only)
+export async function GET() {
+  return NextResponse.json(
+    { ok: false, error: "method_not_allowed" },
+    { status: 405 }
   );
 }
-
-async function ensureConversationId(
-  convId: string | null,
-  supabase: ReturnType<typeof supabaseAdmin>,
-  jar: ReturnType<typeof cookies>,
-  ip: string
-): Promise<string> {
-  if (convId) return convId;
-
-  const WEB_CHAT_OWNER_USER_ID = process.env.WEB_CHAT_OWNER_USER_ID;
-  if (!WEB_CHAT_OWNER_USER_ID) {
-    throw new Error("WEB_CHAT_OWNER_USER_ID env not set");
-  }
-
-  // Minimal insert with required user_id
-  const { data, error } = await supabase
-    .from("conversations")
-    .insert({ title: null, created_ip: ip, user_id: WEB_CHAT_OWNER_USER_ID })
-    .select("id")
-    .maybeSingle();
-
-  if (error || !data?.id) throw new Error(error?.message || "conv-create-failed");
-
-  // Set cookie so subsequent messages reuse this conversation
-  jar.set("wt_conversation_id", data.id, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: true,
-    path: "/",
-    maxAge: 60 * 60 * 24 * 14, // 14 days
-  });
-
-  return data.id;
-}
-
