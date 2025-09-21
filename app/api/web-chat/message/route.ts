@@ -72,8 +72,7 @@ export async function POST(req: Request) {
         conversation_id,
         role: "user",
         content,
-        source: "web", // remove this line if your table doesn't have 'source'
-        source_ip: ip,  // remove if you didn't add this column
+        source_ip: ip, // if you *didn’t* add this column, you can remove this line too
       })
       .select("id")
       .maybeSingle();
