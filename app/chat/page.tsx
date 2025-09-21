@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import BrandHeader from "../../components/BrandHeader";
 import { supabaseBrowser } from "../../lib/supabaseBrowser";
+import RateLimitToast from "../../components/RateLimitToast";
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
@@ -21,6 +22,13 @@ export default function WebChatPage() {
   const [sending, setSending] = useState(false);
   const [assistantTyping, setAssistantTyping] = useState(false);
   const [policy, setPolicy] = useState<Policy>(null);
+
+  // NEW: rate-limit toast state
+  const [rlOpen, setRlOpen] = useState(false);
+  const [rlMessage, setRlMessage] = useState(
+    "You’re sending too quickly. Please wait a few seconds and try again."
+  );
+
   const abortRef = useRef<AbortController | null>(null);
 
   const trimmed = input.trim();
@@ -101,6 +109,16 @@ export default function WebChatPage() {
         body: JSON.stringify({ content: text }),
         cache: "no-store",
       });
+
+      // NEW: handle rate limit (429) early, roll back optimistic bubble, show toast
+      if (persist.status === 429) {
+        setMessages((prev) => prev.slice(0, -1)); // remove optimistic user message
+        setRlMessage("You’re sending too quickly. Please wait a few seconds and try again.");
+        setRlOpen(true);
+        setPolicy(null);
+        return;
+      }
+
       const pjson = await persist.json().catch(() => ({} as any));
       if (!persist.ok || pjson?.ok === false) {
         const msg = pjson?.error ? `${pjson.stage ?? "persist"}: ${pjson.error}` : `HTTP ${persist.status}`;
@@ -260,6 +278,9 @@ export default function WebChatPage() {
           </div>
         </section>
       </div>
+
+      {/* Toast (rate limit) */}
+      <RateLimitToast open={rlOpen} message={rlMessage} onClose={() => setRlOpen(false)} />
 
       {/* Scoped CSS with your palette + primary color */}
       <style jsx>{`
