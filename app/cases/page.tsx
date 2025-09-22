@@ -1,7 +1,7 @@
 // app/cases/page.tsx
 import Link from "next/link";
 import { supabaseAdmin } from "../../lib/supabaseServer";
-import RefreshListClient from "./RefreshListClient";
+import AutoRefresher from "./AutoRefresher";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,7 @@ export default async function CasesPage() {
 
   return (
     <main className="wt-main">
-      <RefreshListClient />
+      <AutoRefresher />
 
       <div className="wt-wrap">
         <header className="wt-header">

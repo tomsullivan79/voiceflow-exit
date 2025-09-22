@@ -1,7 +1,7 @@
 // app/cases/[id]/page.tsx
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "../../../lib/supabaseServer";
-import RefreshDetailClient from "./RefreshDetailClient";
+import AutoRefresher from "./AutoRefresher";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +50,7 @@ export default async function CaseDetailPage({ params }: PageProps) {
 
   return (
     <main className="wt-main">
-      <RefreshDetailClient conversationId={conversationId} />
+      <AutoRefresher conversationId={conversationId} />
       <div className="wt-wrap">
         <header className="wt-header">
           <h1>{conv.title || "Case"}</h1>
