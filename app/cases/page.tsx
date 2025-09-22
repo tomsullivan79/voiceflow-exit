@@ -2,8 +2,9 @@
 import Link from "next/link";
 import { supabaseAdmin } from "../../lib/supabaseServer";
 import RefreshListClient from "./RefreshListClient";
-
+import RefreshListClient from "./RefreshListClient";
 export const dynamic = "force-dynamic";
+
 
 type ConversationRow = {
   id: string;
@@ -23,46 +24,36 @@ async function getConversations(): Promise<ConversationRow[]> {
   return (data ?? []) as ConversationRow[];
 }
 
-export default async function CasesPage() {
+eexport default async function CasesPage() {
   const rows = await getConversations();
-
   return (
     <main className="wt-main">
-      {/* Client bridge for realtime list refresh */}
       <RefreshListClient />
-
       <div className="wt-wrap">
         <header className="wt-header">
           <h1>Cases</h1>
           <p className="wt-sub">Newest first. This list live-updates on new activity.</p>
         </header>
 
-        <section className="wt-list">
+        <section>
           {rows.length === 0 ? (
-            <div className="wt-card">No cases yet.</div>
+            <div>No cases yet.</div>
           ) : (
-            rows.map((c) => (
-              <Link key={c.id} href={`/cases/${c.id}`} className="wt-card wt-case">
-                <div className="wt-row">
-                  <div className="wt-title">{c.title || "Untitled Case"}</div>
-                  <div className={`wt-badge ${c.closed_at ? "wt-badge-closed" : "wt-badge-open"}`}>
-                    {c.closed_at ? "Closed" : "Open"}
+            rows.map((c, i) => (
+              <div key={c.id}>
+                <a href={`/cases/${c.id}`} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
+                  <div style={{ fontWeight: 700 }}>{c.title || "Untitled Case"}</div>
+                  <div>{c.closed_at ? "Closed" : "Open"}</div>
+                  <div style={{ fontSize: 12, opacity: 0.75 }}>
+                    Created: {new Date(c.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
+                    {c.closed_at && (
+                      <> • Closed: {new Date(c.closed_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}</>
+                    )}
                   </div>
-                </div>
-                <div className="wt-meta">
-                  <span>
-                    Created:{" "}
-                    {new Date(c.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
-                  </span>
-                  {c.closed_at && (
-                    <span>
-                      {" "}
-                      • Closed:{" "}
-                      {new Date(c.closed_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
-                    </span>
-                  )}
-                </div>
-              </Link>
+                </a>
+                {/* spacer */}
+                {i < rows.length - 1 ? <div style={{ height: 12 }} /> : null}
+              </div>
             ))
           )}
         </section>

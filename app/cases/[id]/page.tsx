@@ -2,7 +2,7 @@
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "../../../lib/supabaseServer";
 import RefreshDetailClient from "./RefreshDetailClient";
-
+import RefreshDetailClient from "./RefreshDetailClient";
 export const dynamic = "force-dynamic";
 
 type PageProps = { params: { id: string } };
@@ -41,46 +41,39 @@ export default async function CaseDetailPage({ params }: PageProps) {
   const conversationId = params.id;
   const conv = await getConversation(conversationId);
   if (!conv) notFound();
-
   const messages = await getMessages(conversationId);
 
   return (
     <main className="wt-main">
-      {/* Client bridge for realtime detail refresh */}
       <RefreshDetailClient conversationId={conversationId} />
-
       <div className="wt-wrap">
         <header className="wt-header">
           <h1>{conv.title || "Case"}</h1>
-          <div className="wt-meta">
+          <div style={{ fontSize: 12, opacity: 0.75 }}>
             <span>
-              Created:{" "}
-              {new Date(conv.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
+              Created: {new Date(conv.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
             </span>
             {conv.closed_at ? <span> • Status: Closed</span> : <span> • Status: Open</span>}
           </div>
         </header>
 
-        <section className="wt-card wt-thread">
+        <section>
           {messages.length === 0 ? (
-            <div className="wt-empty">No messages yet.</div>
+            <div>No messages yet.</div>
           ) : (
-            <ul className="wt-list">
-              {messages.map((m, i) => (
-                <li
-                  key={`${i}-${m.created_at}`}
-                  className={`wt-msg ${m.role === "assistant" ? "wt-assistant" : "wt-user"}`}
-                >
-                  <div className="wt-head">
-                    <span className="wt-role">{m.role}</span>
-                    <span className="wt-time">
-                      {new Date(m.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
-                    </span>
-                  </div>
-                  <div className="wt-body">{m.content ?? ""}</div>
-                </li>
-              ))}
-            </ul>
+            messages.map((m, i) => (
+              <div key={`${i}-${m.created_at}`}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, opacity: 0.8 }}>
+                  <span style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>{m.role}</span>
+                  <span>
+                    {new Date(m.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
+                  </span>
+                </div>
+                <div style={{ whiteSpace: "pre-wrap" }}>{m.content ?? ""}</div>
+                {/* spacer */}
+                {i < messages.length - 1 ? <div style={{ height: 12 }} /> : null}
+              </div>
+            ))
           )}
         </section>
       </div>
