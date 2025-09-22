@@ -2,9 +2,8 @@
 import Link from "next/link";
 import { supabaseAdmin } from "../../lib/supabaseServer";
 import RefreshListClient from "./RefreshListClient";
-import RefreshListClient from "./RefreshListClient";
-export const dynamic = "force-dynamic";
 
+export const dynamic = "force-dynamic";
 
 type ConversationRow = {
   id: string;
@@ -24,11 +23,13 @@ async function getConversations(): Promise<ConversationRow[]> {
   return (data ?? []) as ConversationRow[];
 }
 
-eexport default async function CasesPage() {
+export default async function CasesPage() {
   const rows = await getConversations();
+
   return (
     <main className="wt-main">
       <RefreshListClient />
+
       <div className="wt-wrap">
         <header className="wt-header">
           <h1>Cases</h1>
@@ -41,17 +42,29 @@ eexport default async function CasesPage() {
           ) : (
             rows.map((c, i) => (
               <div key={c.id}>
-                <a href={`/cases/${c.id}`} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
+                <a
+                  href={`/cases/${c.id}`}
+                  style={{ display: "block", textDecoration: "none", color: "inherit" }}
+                >
                   <div style={{ fontWeight: 700 }}>{c.title || "Untitled Case"}</div>
                   <div>{c.closed_at ? "Closed" : "Open"}</div>
                   <div style={{ fontSize: 12, opacity: 0.75 }}>
-                    Created: {new Date(c.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
+                    Created:{" "}
+                    {new Date(c.created_at).toLocaleString("en-US", {
+                      timeZone: "America/Chicago",
+                    })}
                     {c.closed_at && (
-                      <> • Closed: {new Date(c.closed_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}</>
+                      <>
+                        {" "}
+                        • Closed:{" "}
+                        {new Date(c.closed_at).toLocaleString("en-US", {
+                          timeZone: "America/Chicago",
+                        })}
+                      </>
                     )}
                   </div>
                 </a>
-                {/* spacer */}
+                {/* spacer between cases */}
                 {i < rows.length - 1 ? <div style={{ height: 12 }} /> : null}
               </div>
             ))

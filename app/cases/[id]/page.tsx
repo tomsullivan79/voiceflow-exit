@@ -2,7 +2,7 @@
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "../../../lib/supabaseServer";
 import RefreshDetailClient from "./RefreshDetailClient";
-import RefreshDetailClient from "./RefreshDetailClient";
+
 export const dynamic = "force-dynamic";
 
 type PageProps = { params: { id: string } };
@@ -13,7 +13,11 @@ type Conversation = {
   created_at: string;
   closed_at: string | null;
 };
-type MessageRow = { role: "user" | "assistant" | string; content: string | null; created_at: string };
+type MessageRow = {
+  role: "user" | "assistant" | string;
+  content: string | null;
+  created_at: string;
+};
 
 async function getConversation(id: string): Promise<Conversation | null> {
   const admin = supabaseAdmin();
@@ -41,6 +45,7 @@ export default async function CaseDetailPage({ params }: PageProps) {
   const conversationId = params.id;
   const conv = await getConversation(conversationId);
   if (!conv) notFound();
+
   const messages = await getMessages(conversationId);
 
   return (
@@ -51,7 +56,10 @@ export default async function CaseDetailPage({ params }: PageProps) {
           <h1>{conv.title || "Case"}</h1>
           <div style={{ fontSize: 12, opacity: 0.75 }}>
             <span>
-              Created: {new Date(conv.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
+              Created:{" "}
+              {new Date(conv.created_at).toLocaleString("en-US", {
+                timeZone: "America/Chicago",
+              })}
             </span>
             {conv.closed_at ? <span> • Status: Closed</span> : <span> • Status: Open</span>}
           </div>
@@ -63,14 +71,25 @@ export default async function CaseDetailPage({ params }: PageProps) {
           ) : (
             messages.map((m, i) => (
               <div key={`${i}-${m.created_at}`}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, opacity: 0.8 }}>
-                  <span style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>{m.role}</span>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: 12,
+                    opacity: 0.8,
+                  }}
+                >
+                  <span style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    {m.role}
+                  </span>
                   <span>
-                    {new Date(m.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
+                    {new Date(m.created_at).toLocaleString("en-US", {
+                      timeZone: "America/Chicago",
+                    })}
                   </span>
                 </div>
                 <div style={{ whiteSpace: "pre-wrap" }}>{m.content ?? ""}</div>
-                {/* spacer */}
+                {/* spacer between messages */}
                 {i < messages.length - 1 ? <div style={{ height: 12 }} /> : null}
               </div>
             ))
