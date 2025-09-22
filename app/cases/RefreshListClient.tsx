@@ -3,7 +3,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "../lib/supabaseBrowser"; // note: path is from /app/cases/*
+import { supabaseBrowser } from "../../lib/supabaseBrowser"; // ← fixed path
 
 export default function RefreshListClient() {
   const router = useRouter();
@@ -12,7 +12,6 @@ export default function RefreshListClient() {
     const supa = supabaseBrowser();
     let poll: ReturnType<typeof setInterval> | null = null;
 
-    // start a gentle polling fallback that stops once realtime confirms subscribed
     const startPolling = () => {
       if (poll) return;
       console.debug("[cases-rt] starting fallback polling");
@@ -27,7 +26,7 @@ export default function RefreshListClient() {
       console.debug("[cases-rt] stopped fallback polling");
     };
 
-    startPolling(); // begin immediately until realtime connects
+    startPolling();
 
     const channel = supa
       .channel("cases-list", { config: { broadcast: { ack: false } } })

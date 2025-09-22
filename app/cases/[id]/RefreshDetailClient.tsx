@@ -3,7 +3,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "../../lib/supabaseBrowser";
+import { supabaseBrowser } from "../../../lib/supabaseBrowser"; // ← fixed path
 
 export default function RefreshDetailClient({ conversationId }: { conversationId: string }) {
   const router = useRouter();
