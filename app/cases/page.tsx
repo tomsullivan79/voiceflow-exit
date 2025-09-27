@@ -1,9 +1,9 @@
 // app/cases/page.tsx
 import Link from "next/link";
 import { supabaseAdmin } from "../../lib/supabaseServer";
-
+import AutoRefresher from "./AutoRefresher"; // ← ensure this exact path
 export const dynamic = "force-dynamic";
-export const fetchCache = "force-no-store"; // ← ensure no caching
+export const fetchCache = "force-no-store";
 
 type ActivityRow = {
   conversation_id: string;
@@ -49,10 +49,13 @@ export default async function CasesPage() {
 
   return (
     <main className="wt-main">
+      {/* The badge + hard-reload poller */}
+      <AutoRefresher />
+
       <div className="wt-wrap">
         <header className="wt-header">
           <h1>Cases</h1>
-          <p className="wt-sub">Sorted by recent activity. Auto-refreshes every few seconds.</p>
+          <p className="wt-sub">Sorted by recent activity. Hard-refreshes every few seconds while this tab is visible.</p>
         </header>
 
         <section>
