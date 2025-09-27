@@ -2,25 +2,19 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export default function AutoRefresher() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const search = useSearchParams();
-
   useEffect(() => {
     console.log("[cases-poll] mounted (list)");
     const id = setInterval(() => {
-      const params = new URLSearchParams(search?.toString() || "");
-      params.set("__ts", String(Date.now())); // cache-bust
-      const url = `${pathname}?${params.toString()}`;
-      console.log("[cases-poll] replace →", url);
-      router.replace(url); // forces server re-render
-    }, 5000);
+      console.log("[cases-poll] hard reload");
+      // Hard reload ensures brand-new conversations show up even if
+      // any cache layer or data memoization is being stubborn.
+      window.location.reload();
+    }, 5000); // keep at 5s to match /chat testing cadence
 
     return () => clearInterval(id);
-  }, [router, pathname, search]);
+  }, []);
 
   return null;
 }
