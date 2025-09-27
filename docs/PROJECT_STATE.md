@@ -1,0 +1,16 @@
+# Project State (Human-Updated)
+
+**Current Step:** <e.g., 16A — De-dupe inbound received>
+**Last Completed:** <e.g., 15C on 2025-09-26 14:05 CT>
+**Feature Flags / Env:** 
+- DISABLE_OUTBOUND_SMS=true
+- NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE, TWILIO_* (present)
+
+**Focus Notes (Next 3)**
+1) …
+2) …
+3) …
+
+**Recent Changes (Short Log)**
+- 2025-09-26: …
+- 2025-09-25: …
