@@ -4,6 +4,7 @@ import { supabaseAdmin } from "../../../lib/supabaseServer";
 import AutoRefresher from "./AutoRefresher";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store"; // ← ensure no caching
 
 type PageProps = { params: { id: string } };
 
@@ -13,11 +14,7 @@ type Conversation = {
   created_at: string;
   closed_at: string | null;
 };
-type MessageRow = {
-  role: "user" | "assistant" | string;
-  content: string | null;
-  created_at: string;
-};
+type MessageRow = { role: "user" | "assistant" | string; content: string | null; created_at: string };
 
 async function getConversation(id: string): Promise<Conversation | null> {
   const admin = supabaseAdmin();
@@ -57,9 +54,7 @@ export default async function CaseDetailPage({ params }: PageProps) {
           <div style={{ fontSize: 12, opacity: 0.75 }}>
             <span>
               Created:{" "}
-              {new Date(conv.created_at).toLocaleString("en-US", {
-                timeZone: "America/Chicago",
-              })}
+              {new Date(conv.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
             </span>
             {conv.closed_at ? <span> • Status: Closed</span> : <span> • Status: Open</span>}
           </div>
@@ -79,17 +74,12 @@ export default async function CaseDetailPage({ params }: PageProps) {
                     opacity: 0.8,
                   }}
                 >
-                  <span style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    {m.role}
-                  </span>
+                  <span style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>{m.role}</span>
                   <span>
-                    {new Date(m.created_at).toLocaleString("en-US", {
-                      timeZone: "America/Chicago",
-                    })}
+                    {new Date(m.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
                   </span>
                 </div>
                 <div style={{ whiteSpace: "pre-wrap" }}>{m.content ?? ""}</div>
-                {/* spacer between messages */}
                 {i < messages.length - 1 ? <div style={{ height: 12 }} /> : null}
               </div>
             ))

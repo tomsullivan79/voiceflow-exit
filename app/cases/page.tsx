@@ -3,6 +3,7 @@ import Link from "next/link";
 import { supabaseAdmin } from "../../lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store"; // ← ensure no caching
 
 type ActivityRow = {
   conversation_id: string;
@@ -42,10 +43,7 @@ async function getConversations(ids: string[]): Promise<Record<string, Conversat
 }
 
 export default async function CasesPage() {
-  // 1) Get activity ordered by latest message
   const activity = await getActivity();
-
-  // 2) Pull corresponding conversation metadata
   const ids = activity.map((a) => a.conversation_id);
   const convMap = await getConversations(ids);
 
@@ -80,7 +78,6 @@ export default async function CasesPage() {
                       Created: {created} • Updated: {updated} • Messages: {a.message_count}
                     </div>
                   </Link>
-                  {/* spacer between cases */}
                   {i < activity.length - 1 ? <div style={{ height: 12 }} /> : null}
                 </div>
               );
