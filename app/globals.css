@@ -99,3 +99,25 @@
 }
 .wt-btn:hover { filter: brightness(1.05); }
 .wt-btn-danger { border-color: rgba(244, 63, 94, 0.5); }
+
+/* === WT Accessibility/contrast overrides === */
+
+/* Give the header action row some breathing room */
+.wt-actions { margin-top: 8px; margin-bottom: 16px; }
+
+/* Dark-mode readability upgrades */
+@media (prefers-color-scheme: dark) {
+  /* /cases: make case titles clearly visible on dark cards */
+  .wt-title { color: #ffffff; }
+
+  /* /cases/[id]: buttons with bold white labels */
+  .wt-btn,
+  .wt-btn.wt-btn-danger {
+    color: #ffffff !important;
+    font-weight: 700;
+  }
+
+  /* /cases/[id]: chat role + body copy in white for clarity */
+  .wt-role { color: #ffffff; font-weight: 700; }
+  .wt-body { color: #ffffff; }
+}
