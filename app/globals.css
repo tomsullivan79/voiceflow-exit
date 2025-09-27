@@ -1,39 +1,51 @@
-/* ==== WildTriage Cases: minimal, server-safe styles ==== */
+/* ==== WildTriage Cases: refined colors & spacing (server-safe) ==== */
 
+/* Light theme tokens */
 :root {
   --wt-max: 920px;
   --wt-radius: 16px;
   --wt-border: rgba(0,0,0,0.08);
   --wt-border-strong: rgba(0,0,0,0.12);
-  --wt-bg-card: #fff;
+  --wt-bg-card: #ffffff;
   --wt-fg-dim: rgba(0,0,0,0.65);
-  --wt-badge-open-bg: #e8f5e9;
-  --wt-badge-open-fg: #1b5e20;
-  --wt-badge-closed-bg: #fff7ed;
+
+  --wt-badge-open-bg: #e9f8ef;
+  --wt-badge-open-fg: #166534;
+  --wt-badge-closed-bg: #fff2e0;
   --wt-badge-closed-fg: #9a3412;
+
+  --wt-msg-bg: #f8fafc;         /* neutral light for bubbles */
+  --wt-msg-assistant: #eef6ff;  /* soft blue */
+  --wt-msg-user: #f0fdf4;       /* soft green */
 }
 
+/* Dark theme tokens */
 @media (prefers-color-scheme: dark) {
   :root {
     --wt-border: rgba(255,255,255,0.12);
-    --wt-border-strong: rgba(255,255,255,0.16);
-    --wt-bg-card: #161616;
-    --wt-fg-dim: rgba(255,255,255,0.75);
-    --wt-badge-open-bg: rgba(76,175,80,0.15);
-    --wt-badge-open-fg: #9ae6b4;
-    --wt-badge-closed-bg: rgba(253,186,116,0.15);
+    --wt-border-strong: rgba(255,255,255,0.18);
+    --wt-bg-card: #1d1f22;          /* deeper card to separate from page */
+    --wt-fg-dim: rgba(255,255,255,0.8);
+
+    --wt-badge-open-bg: rgba(34,197,94,0.18);
+    --wt-badge-open-fg: #86efac;
+    --wt-badge-closed-bg: rgba(251,146,60,0.18);
     --wt-badge-closed-fg: #fbbf24;
+
+    --wt-msg-bg: #1f2937;           /* neutral slate */
+    --wt-msg-assistant: rgba(59,130,246,0.18);
+    --wt-msg-user: rgba(34,197,94,0.18);
   }
 }
 
 /* Layout */
 .wt-main { min-height: 60vh; }
 .wt-wrap { max-width: var(--wt-max); margin: 0 auto; padding: 24px 16px; }
-.wt-header h1 { margin: 0 0 4px; font-size: 24px; }
-.wt-sub { margin: 0 0 12px; color: var(--wt-fg-dim); }
+.wt-header h1 { margin: 0 0 6px; font-size: 26px; line-height: 1.2; }
+.wt-sub { margin: 0 0 14px; color: var(--wt-fg-dim); }
 
 /* Cards & lists */
-.wt-list { display: grid; gap: 12px; }
+.wt-list { display: grid; gap: 12px; list-style: none; padding: 0; margin: 0; }
 .wt-card {
   display: block;
   border: 1px solid var(--wt-border);
@@ -52,13 +64,13 @@
 /* Badges */
 .wt-badge {
   display: inline-block;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
   border: 1px solid var(--wt-border-strong);
 }
-.wt-badge-open { background: var(--wt-badge-open-bg); color: var(--wt-badge-open-fg); }
-.wt-badge-closed { background: var(--wt-badge-closed-bg); color: var(--wt-badge-closed-fg); }
+.wt-badge-open  { background: var(--wt-badge-open-bg);  color: var(--wt-badge-open-fg); }
+.wt-badge-closed{ background: var(--wt-badge-closed-bg); color: var(--wt-badge-closed-fg); }
 
 /* Thread view */
 .wt-thread { padding: 16px; }
@@ -67,21 +79,23 @@
   border: 1px solid var(--wt-border);
   border-radius: 12px;
   padding: 10px;
-  background: #fafafa;
-}
-@media (prefers-color-scheme: dark) {
-  .wt-msg { background: #1b1b1b; }
+  background: var(--wt-msg-bg);
 }
 .wt-msg + .wt-msg { margin-top: 10px; }
-
-.wt-assistant { background: #eef6ff; }
-.wt-user { background: #f4fce3; }
-@media (prefers-color-scheme: dark) {
-  .wt-assistant { background: rgba(147,197,253,0.12); }
-  .wt-user { background: rgba(163,230,53,0.12); }
-}
+.wt-assistant { background: var(--wt-msg-assistant); }
+.wt-user      { background: var(--wt-msg-user); }
 
 .wt-head { display: flex; justify-content: space-between; font-size: 12px; color: var(--wt-fg-dim); margin-bottom: 6px; }
 .wt-role { text-transform: uppercase; letter-spacing: 0.06em; }
 .wt-time { font-variant-numeric: tabular-nums; }
 .wt-body { white-space: pre-wrap; }
+
+/* Simple link button for header actions */
+.wt-actions { display: flex; gap: 10px; align-items: center; margin-top: 6px; }
+.wt-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 10px; font-size: 13px; text-decoration: none;
+  border: 1px solid var(--wt-border-strong); color: inherit; background: var(--wt-bg-card);
+}
+.wt-btn:hover { filter: brightness(1.05); }
+.wt-btn-danger { border-color: rgba(244, 63, 94, 0.5); }

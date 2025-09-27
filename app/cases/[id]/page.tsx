@@ -1,7 +1,9 @@
 // app/cases/[id]/page.tsx
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "../../../lib/supabaseServer";
 import AutoRefresher from "./AutoRefresher";
+import CloseCaseButton from "./CloseCaseButton";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -48,14 +50,21 @@ export default async function CaseDetailPage({ params }: PageProps) {
   return (
     <main className="wt-main">
       <AutoRefresher conversationId={conversationId} />
+
       <div className="wt-wrap">
         <header className="wt-header">
-          <h1>{conv.title || "Case"}</h1>
+          <h1>{conv.title || "Web Chat"}</h1>
+
           <div className="wt-meta">
             <span>
               Created: {new Date(conv.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
             </span>
             {conv.closed_at ? <span> • Status: Closed</span> : <span> • Status: Open</span>}
+          </div>
+
+          <div className="wt-actions">
+            <Link className="wt-btn" href="/cases">← Back to Cases</Link>
+            {!conv.closed_at && <CloseCaseButton conversationId={conversationId} />}
           </div>
         </header>
 
