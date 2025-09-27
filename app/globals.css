@@ -1,42 +1,87 @@
+/* ==== WildTriage Cases: minimal, server-safe styles ==== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --wt-max: 920px;
+  --wt-radius: 16px;
+  --wt-border: rgba(0,0,0,0.08);
+  --wt-border-strong: rgba(0,0,0,0.12);
+  --wt-bg-card: #fff;
+  --wt-fg-dim: rgba(0,0,0,0.65);
+  --wt-badge-open-bg: #e8f5e9;
+  --wt-badge-open-fg: #1b5e20;
+  --wt-badge-closed-bg: #fff7ed;
+  --wt-badge-closed-fg: #9a3412;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --wt-border: rgba(255,255,255,0.12);
+    --wt-border-strong: rgba(255,255,255,0.16);
+    --wt-bg-card: #161616;
+    --wt-fg-dim: rgba(255,255,255,0.75);
+    --wt-badge-open-bg: rgba(76,175,80,0.15);
+    --wt-badge-open-fg: #9ae6b4;
+    --wt-badge-closed-bg: rgba(253,186,116,0.15);
+    --wt-badge-closed-fg: #fbbf24;
   }
 }
 
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
+/* Layout */
+.wt-main { min-height: 60vh; }
+.wt-wrap { max-width: var(--wt-max); margin: 0 auto; padding: 24px 16px; }
+.wt-header h1 { margin: 0 0 4px; font-size: 24px; }
+.wt-sub { margin: 0 0 12px; color: var(--wt-fg-dim); }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
-
-a {
-  color: inherit;
+/* Cards & lists */
+.wt-list { display: grid; gap: 12px; }
+.wt-card {
+  display: block;
+  border: 1px solid var(--wt-border);
+  border-radius: var(--wt-radius);
+  padding: 14px;
+  background: var(--wt-bg-card);
   text-decoration: none;
+  color: inherit;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+/* Case row */
+.wt-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.wt-title { font-weight: 700; }
+.wt-meta { margin-top: 6px; font-size: 12px; color: var(--wt-fg-dim); }
+
+/* Badges */
+.wt-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--wt-border-strong);
 }
+.wt-badge-open { background: var(--wt-badge-open-bg); color: var(--wt-badge-open-fg); }
+.wt-badge-closed { background: var(--wt-badge-closed-bg); color: var(--wt-badge-closed-fg); }
+
+/* Thread view */
+.wt-thread { padding: 16px; }
+.wt-empty { color: var(--wt-fg-dim); }
+.wt-msg {
+  border: 1px solid var(--wt-border);
+  border-radius: 12px;
+  padding: 10px;
+  background: #fafafa;
+}
+@media (prefers-color-scheme: dark) {
+  .wt-msg { background: #1b1b1b; }
+}
+.wt-msg + .wt-msg { margin-top: 10px; }
+
+.wt-assistant { background: #eef6ff; }
+.wt-user { background: #f4fce3; }
+@media (prefers-color-scheme: dark) {
+  .wt-assistant { background: rgba(147,197,253,0.12); }
+  .wt-user { background: rgba(163,230,53,0.12); }
+}
+
+.wt-head { display: flex; justify-content: space-between; font-size: 12px; color: var(--wt-fg-dim); margin-bottom: 6px; }
+.wt-role { text-transform: uppercase; letter-spacing: 0.06em; }
+.wt-time { font-variant-numeric: tabular-nums; }
+.wt-body { white-space: pre-wrap; }

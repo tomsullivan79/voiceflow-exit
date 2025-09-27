@@ -4,7 +4,7 @@ import { supabaseAdmin } from "../../../lib/supabaseServer";
 import AutoRefresher from "./AutoRefresher";
 
 export const dynamic = "force-dynamic";
-export const fetchCache = "force-no-store"; // ← ensure no caching
+export const fetchCache = "force-no-store";
 
 type PageProps = { params: { id: string } };
 
@@ -51,38 +51,34 @@ export default async function CaseDetailPage({ params }: PageProps) {
       <div className="wt-wrap">
         <header className="wt-header">
           <h1>{conv.title || "Case"}</h1>
-          <div style={{ fontSize: 12, opacity: 0.75 }}>
+          <div className="wt-meta">
             <span>
-              Created:{" "}
-              {new Date(conv.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
+              Created: {new Date(conv.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
             </span>
             {conv.closed_at ? <span> • Status: Closed</span> : <span> • Status: Open</span>}
           </div>
         </header>
 
-        <section>
+        <section className="wt-card wt-thread">
           {messages.length === 0 ? (
-            <div>No messages yet.</div>
+            <div className="wt-empty">No messages yet.</div>
           ) : (
-            messages.map((m, i) => (
-              <div key={`${i}-${m.created_at}`}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: 12,
-                    opacity: 0.8,
-                  }}
+            <ul className="wt-list" style={{ gap: 10 }}>
+              {messages.map((m, i) => (
+                <li
+                  key={`${i}-${m.created_at}`}
+                  className={`wt-msg ${m.role === "assistant" ? "wt-assistant" : "wt-user"}`}
                 >
-                  <span style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>{m.role}</span>
-                  <span>
-                    {new Date(m.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
-                  </span>
-                </div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{m.content ?? ""}</div>
-                {i < messages.length - 1 ? <div style={{ height: 12 }} /> : null}
-              </div>
-            ))
+                  <div className="wt-head">
+                    <span className="wt-role">{m.role}</span>
+                    <span className="wt-time">
+                      {new Date(m.created_at).toLocaleString("en-US", { timeZone: "America/Chicago" })}
+                    </span>
+                  </div>
+                  <div className="wt-body">{m.content ?? ""}</div>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
       </div>
