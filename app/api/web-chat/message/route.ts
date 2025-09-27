@@ -22,6 +22,28 @@ const RL_LIMIT       = parseInt(process.env.WEBCHAT_RL_LIMIT ?? "3", 10);
 const RL_WINDOW_SEC  = parseInt(process.env.WEBCHAT_RL_WINDOW_SEC ?? "30", 10);
 const RL_ENABLED     = (process.env.WEBCHAT_RL_ENABLED ?? "false").toLowerCase() === "true";
 
+// --- Helpers -----------------------------------------------------------------
+
+function normalizeWhitespace(s: string) {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function sentenceCase(s: string) {
+  if (!s) return s;
+  return s[0].toUpperCase() + s.slice(1);
+}
+
+/** Create a short, readable title from the first user message. */
+function makeTitleFromContent(content: string) {
+  const base = sentenceCase(normalizeWhitespace(content || "").replace(/[\r\n]+/g, " "));
+  // Prefer up to first period/question/exclamation; otherwise clamp to ~48 chars
+  const punct = base.search(/[.!?]/);
+  let slice = punct > -1 ? base.slice(0, punct + 1) : base.slice(0, 48);
+  if (slice.length < base.length && !/[.!?]$/.test(slice)) slice = slice.trimEnd() + "…";
+  // Guard: fallback if empty
+  return slice || "Web Chat";
+}
+
 // Normalize detector output to a string slug (or null)
 function extractSlug(d: any): string | null {
   if (!d) return null;
@@ -44,6 +66,8 @@ function getSourceIp(req: Request): string | null {
   return req.headers.get("x-real-ip") || null;
 }
 
+// -----------------------------------------------------------------------------
+
 export async function POST(req: Request) {
   const startedAt = Date.now();
 
@@ -61,6 +85,7 @@ export async function POST(req: Request) {
 
     // Conversation id (create if needed)
     let conversationId = jar.get(CONV_COOKIE)?.value || null;
+    let createdNow = false;
 
     if (!conversationId) {
       if (!OWNER_USER_ID) {
@@ -69,9 +94,17 @@ export async function POST(req: Request) {
           { status: 500 }
         );
       }
+
+      // NEW: set a descriptive title on creation based on the user's first message
+      const title = makeTitleFromContent(content);
+
       const { data, error } = await admin
         .from("conversations")
-        .insert({ user_id: OWNER_USER_ID, title: "Web Chat", created_ip: source_ip ?? null })
+        .insert({
+          user_id: OWNER_USER_ID,
+          title,
+          created_ip: source_ip ?? null,
+        })
         .select("id")
         .single();
 
@@ -82,6 +115,7 @@ export async function POST(req: Request) {
         );
       }
       conversationId = data.id as string;
+      createdNow = true;
     }
 
     // Keep legacy mapping in sync (cookie + upsert)
@@ -105,7 +139,6 @@ export async function POST(req: Request) {
       countBefore = count ?? 0;
     } catch { /* ignore */ }
 
-    // ENFORCE (optional): if enabled and already at/above limit, 429
     if (RL_ENABLED && countBefore >= RL_LIMIT) {
       const res429 = NextResponse.json(
         { ok: false, error: "rate_limited", stage: "rate_limit" },
@@ -142,7 +175,7 @@ export async function POST(req: Request) {
 
     // Build json response
     const res = NextResponse.json(
-      { ok: true, conversation_id: conversationId, speciesSlug, policy, ms: Date.now() - startedAt },
+      { ok: true, conversation_id: conversationId, speciesSlug, policy, createdNow, ms: Date.now() - startedAt },
       { status: 200 }
     );
 
