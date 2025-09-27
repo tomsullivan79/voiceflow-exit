@@ -22,59 +22,59 @@ const RL_LIMIT       = parseInt(process.env.WEBCHAT_RL_LIMIT ?? "3", 10);
 const RL_WINDOW_SEC  = parseInt(process.env.WEBCHAT_RL_WINDOW_SEC ?? "30", 10);
 const RL_ENABLED     = (process.env.WEBCHAT_RL_ENABLED ?? "false").toLowerCase() === "true";
 
-// --- Helpers -----------------------------------------------------------------
-
-function normalizeWhitespace(s: string) {
-  return s.replace(/\s+/g, " ").trim();
-}
-
-function sentenceCase(s: string) {
-  if (!s) return s;
-  return s[0].toUpperCase() + s.slice(1);
-}
-
-/** Create a short, readable title from the first user message. */
+// ---------- helpers ----------
+function normalizeWhitespace(s: string) { return s.replace(/\s+/g, " ").trim(); }
+function sentenceCase(s: string) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
 function makeTitleFromContent(content: string) {
-  const base = sentenceCase(normalizeWhitespace(content || "").replace(/[\r\n]+/g, " "));
-  // Prefer up to first period/question/exclamation; otherwise clamp to ~48 chars
+  const base = sentenceCase(normalizeWhitespace((content || "").replace(/[\r\n]+/g, " ")));
   const punct = base.search(/[.!?]/);
   let slice = punct > -1 ? base.slice(0, punct + 1) : base.slice(0, 48);
   if (slice.length < base.length && !/[.!?]$/.test(slice)) slice = slice.trimEnd() + "…";
-  // Guard: fallback if empty
   return slice || "Web Chat";
 }
-
-// Normalize detector output to a string slug (or null)
 function extractSlug(d: any): string | null {
   if (!d) return null;
   if (typeof d === "string") return d || null;
   if (typeof d.slug === "string" && d.slug) return d.slug;
   if (typeof d.speciesSlug === "string" && d.speciesSlug) return d.speciesSlug;
   if (typeof d.value === "string" && d.value) return d.value;
-  if (Array.isArray(d)) {
-    for (const v of d) {
-      const s = extractSlug(v);
-      if (s) return s;
-    }
-  }
+  if (Array.isArray(d)) for (const v of d) { const s = extractSlug(v); if (s) return s; }
   return null;
 }
-
 function getSourceIp(req: Request): string | null {
   const xf = req.headers.get("x-forwarded-for");
   if (xf) return xf.split(",")[0]?.trim() || null;
   return req.headers.get("x-real-ip") || null;
 }
 
-// -----------------------------------------------------------------------------
+async function ensureConversationId(admin: ReturnType<typeof supabaseAdmin>, wantId: string | null, title: string, source_ip: string | null) {
+  if (!OWNER_USER_ID) throw new Error("missing_OWNER_USER_ID_env");
+  // If client sent a conversation id, verify it still exists (it may have been purged).
+  if (wantId) {
+    const { data, error } = await admin
+      .from("conversations")
+      .select("id")
+      .eq("id", wantId)
+      .maybeSingle();
+    if (!error && data?.id) return { id: data.id as string, createdNow: false };
+  }
+  // Create new conversation
+  const { data, error } = await admin
+    .from("conversations")
+    .insert({ user_id: OWNER_USER_ID, title, created_ip: source_ip ?? null })
+    .select("id")
+    .single();
+  if (error || !data?.id) throw new Error(error?.message || "conversation_insert_failed");
+  return { id: data.id as string, createdNow: true };
+}
 
+// ---------- handler ----------
 export async function POST(req: Request) {
   const startedAt = Date.now();
 
   try {
     const body = await req.json().catch(() => null);
     const content = (body?.content ?? "").toString();
-
     if (!content || !content.trim()) {
       return NextResponse.json({ ok: false, error: "empty_content", stage: "validate" }, { status: 400 });
     }
@@ -83,50 +83,23 @@ export async function POST(req: Request) {
     const source_ip = getSourceIp(req);
     const admin = supabaseAdmin();
 
-    // Conversation id (create if needed)
-    let conversationId = jar.get(CONV_COOKIE)?.value || null;
-    let createdNow = false;
+    // establish / validate conversation id
+    const cookieConvId = jar.get(CONV_COOKIE)?.value || null;
+    const { id: conversationId, createdNow } = await ensureConversationId(
+      admin,
+      cookieConvId,
+      makeTitleFromContent(content),
+      source_ip
+    );
 
-    if (!conversationId) {
-      if (!OWNER_USER_ID) {
-        return NextResponse.json(
-          { ok: false, error: "missing_OWNER_USER_ID_env", stage: "ensureConversation" },
-          { status: 500 }
-        );
-      }
-
-      // NEW: set a descriptive title on creation based on the user's first message
-      const title = makeTitleFromContent(content);
-
-      const { data, error } = await admin
-        .from("conversations")
-        .insert({
-          user_id: OWNER_USER_ID,
-          title,
-          created_ip: source_ip ?? null,
-        })
-        .select("id")
-        .single();
-
-      if (error || !data?.id) {
-        return NextResponse.json(
-          { ok: false, error: error?.message || "conversation_insert_failed", stage: "ensureConversation" },
-          { status: 500 }
-        );
-      }
-      conversationId = data.id as string;
-      createdNow = true;
-    }
-
-    // Keep legacy mapping in sync (cookie + upsert)
+    // Keep cookie mapping in sync
     let webCookieId = jar.get(WEB_COOKIE)?.value || null;
     if (!webCookieId) webCookieId = crypto.randomUUID();
-
     await admin
       .from("web_conversation_cookies")
       .upsert({ cookie_id: webCookieId, conversation_id: conversationId }, { onConflict: "cookie_id" });
 
-    // --- Rate-limit count BEFORE insert (for headers + optional enforcement)
+    // Rate-limit count BEFORE insert (for headers + optional enforcement)
     let countBefore = 0;
     try {
       const cutoffIso = new Date(Date.now() - RL_WINDOW_SEC * 1000).toISOString();
@@ -137,7 +110,7 @@ export async function POST(req: Request) {
         .eq("role", "user")
         .gt("created_at", cutoffIso);
       countBefore = count ?? 0;
-    } catch { /* ignore */ }
+    } catch {}
 
     if (RL_ENABLED && countBefore >= RL_LIMIT) {
       const res429 = NextResponse.json(
@@ -152,20 +125,35 @@ export async function POST(req: Request) {
       return res429;
     }
 
-    // Persist user message
-    {
+    // Persist user message (with safety retry on FK violation)
+    async function insertUserMessage(targetConvId: string) {
       const { error } = await admin.from("conversation_messages").insert({
-        conversation_id: conversationId,
+        conversation_id: targetConvId,
         role: "user",
         content,
         source_ip: source_ip ?? null,
       });
-      if (error) {
-        return NextResponse.json(
-          { ok: false, error: error.message, stage: "persist_user" },
-          { status: 500 }
-        );
+      return error;
+    }
+
+    let persistError = await insertUserMessage(conversationId);
+    if (persistError && (persistError.code === "23503" || /foreign key/i.test(persistError.message))) {
+      // FK failed (stale id) → create a fresh conversation and retry once
+      const fallback = await ensureConversationId(admin, null, makeTitleFromContent(content), source_ip);
+      await admin
+        .from("web_conversation_cookies")
+        .upsert({ cookie_id: webCookieId, conversation_id: fallback.id }, { onConflict: "cookie_id" });
+      persistError = await insertUserMessage(fallback.id);
+      if (!persistError) {
+        // also update cookie to the fallback id in the response below
+        (jar as any)._forceConvId = fallback.id; // marker for below cookie set
       }
+    }
+    if (persistError) {
+      return NextResponse.json(
+        { ok: false, error: persistError.message, stage: "persist_user" },
+        { status: 500 }
+      );
     }
 
     // Species detection + policy resolution
@@ -173,24 +161,28 @@ export async function POST(req: Request) {
     const speciesSlug = extractSlug(detected);
     const policy = speciesSlug ? await resolvePolicyForSpecies(speciesSlug, ORG_SLUG) : null;
 
-    // Build json response
+    // Build response
     const res = NextResponse.json(
-      { ok: true, conversation_id: conversationId, speciesSlug, policy, createdNow, ms: Date.now() - startedAt },
+      { ok: true, conversation_id: ((jar as any)._forceConvId as string) || conversationId, speciesSlug, policy, createdNow, ms: Date.now() - startedAt },
       { status: 200 }
     );
 
     // Set/refresh cookies
     res.cookies.set({
-      name: CONV_COOKIE, value: conversationId, httpOnly: true, sameSite: "lax", secure: true, path: "/", maxAge: CONV_COOKIE_MAX_AGE,
+      name: CONV_COOKIE,
+      value: ((jar as any)._forceConvId as string) || conversationId,
+      httpOnly: true, sameSite: "lax", secure: true, path: "/", maxAge: CONV_COOKIE_MAX_AGE,
     });
     res.cookies.set({
-      name: WEB_COOKIE, value: webCookieId, httpOnly: true, sameSite: "lax", secure: true, path: "/", maxAge: WEB_COOKIE_MAX_AGE,
+      name: WEB_COOKIE,
+      value: webCookieId,
+      httpOnly: true, sameSite: "lax", secure: true, path: "/", maxAge: WEB_COOKIE_MAX_AGE,
     });
 
     // Debug headers
     const remainingAfter = Math.max(0, RL_LIMIT - (countBefore + 1));
     res.headers.set("x-policy-debug", `species=${speciesSlug ?? "null"}`);
-    res.headers.set("x-conversation-id", conversationId);
+    res.headers.set("x-conversation-id", ((jar as any)._forceConvId as string) || conversationId);
     res.headers.set("x-rate-limit-limit", String(RL_LIMIT));
     res.headers.set("x-rate-limit-window-sec", String(RL_WINDOW_SEC));
     res.headers.set("x-rate-limit-count-before", String(countBefore));
