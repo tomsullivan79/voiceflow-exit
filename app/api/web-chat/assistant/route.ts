@@ -10,9 +10,7 @@ export const dynamic = "force-dynamic";
 const CONV_COOKIE = "wt_conversation_id";
 const ORG_SLUG = process.env.ORG_SLUG || "wrc-mn";
 
-// --- helpers (mirror message route) ---
-function normalizeWhitespace(s: string) { return s.replace(/\s+/g, " ").trim(); }
-function sentenceCase(s: string) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+// --- helpers (shared with message route) ---
 function extractSlug(d: any): string | null {
   if (!d) return null;
   if (typeof d === "string") return d || null;
@@ -23,7 +21,6 @@ function extractSlug(d: any): string | null {
   return null;
 }
 
-// Short, empathetic, policy-aware reply (same as message route)
 function buildPolicyReply(policy: any): string {
   if (!policy || typeof policy !== "object") return "";
   const type = policy.type as string | undefined;
@@ -102,22 +99,28 @@ export async function POST() {
       });
     }
 
-    // 2) Otherwise, compute a policy-aware reply from the latest user message
-    const userText = (lastUser?.content || "").toString();
-    let content = "How can I assist you today?"; // fallback
-
-    if (userText.trim()) {
-      const detected = await detectSpeciesSlugFromText(userText);
-      const speciesSlug = extractSlug(detected);
-      const policy = speciesSlug ? await resolvePolicyForSpecies(speciesSlug, ORG_SLUG) : null;
-
-      if (policy) {
-        const assistant = buildPolicyReply(policy);
-        if (assistant) content = assistant;
-      }
+    // 2) Otherwise, try to generate a policy-aware reply
+    const userText = (lastUser?.content || "").toString().trim();
+    if (!userText) {
+      // No user text → do nothing (avoid inserting generic filler)
+      return NextResponse.json({ ok: true, conversation_id: conversationId, content: "", reused: false, skipped: true });
     }
 
-    // 3) Persist the assistant reply we decided on
+    const detected = await detectSpeciesSlugFromText(userText);
+    const speciesSlug = extractSlug(detected);
+    const policy = speciesSlug ? await resolvePolicyForSpecies(speciesSlug, ORG_SLUG) : null;
+
+    if (!policy) {
+      // No policy match → do nothing (avoid generic reply)
+      return NextResponse.json({ ok: true, conversation_id: conversationId, content: "", reused: false, skipped: true });
+    }
+
+    const content = buildPolicyReply(policy) || "";
+    if (!content) {
+      return NextResponse.json({ ok: true, conversation_id: conversationId, content: "", reused: false, skipped: true });
+    }
+
+    // 3) Persist the policy-aware reply
     const { error: insErr } = await admin.from("conversation_messages").insert({
       conversation_id: conversationId,
       role: "assistant",
