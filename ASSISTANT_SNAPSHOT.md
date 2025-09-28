@@ -6,7 +6,7 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 37d46d8 — C1-1a: Add conversations DDL + indexes to SCHEMA.sql
+- **Latest commit**: b1003c6 — added schema.sql and data-model.md
 - **Updated (America/Chicago)**: 2025-09-27 19:03 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
