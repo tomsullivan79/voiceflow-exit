@@ -34,16 +34,40 @@ jobs:
       - name: Generate assistant/data-model.md
         run: node scripts/data-model-from-sql.mjs
 
-      - name: Show diff
+      - name: Detect changes
+        id: diff
+        shell: bash
         run: |
-          git --no-pager status --porcelain
-          git --no-pager diff --name-only -- db/SCHEMA.md assistant/data-model.md || true
+          set -euo pipefail
+          if git diff --quiet -- db/SCHEMA.md assistant/data-model.md; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No changes in generated files."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Changes detected:"
+            git --no-pager diff --name-only -- db/SCHEMA.md assistant/data-model.md
+          fi
 
-      - name: Commit both schema docs
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "[skip ci][ci skip] C1-sync: Auto-generate schema docs"
-          branch: main
-          file_pattern: |
-            db/SCHEMA.md
-            assistant/data-model.md
+      - name: Commit & push with rebase (and safe fallback)
+        if: steps.diff.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add db/SCHEMA.md assistant/data-model.md
+          git commit -m "[skip ci][ci skip] C1-sync: Auto-generate schema docs" || {
+            echo "Nothing to commit after add."; exit 0;
+          }
+
+          # Try a clean rebase push first
+          git pull --rebase origin main || true
+          git push && exit 0
+
+          # If it still races, try one more pull/rebase then push
+          git pull --rebase origin main || true
+          git push && exit 0
+
+          # Last resort for rewritten histories: force-with-lease (safe force)
+          git push --force-with-lease
