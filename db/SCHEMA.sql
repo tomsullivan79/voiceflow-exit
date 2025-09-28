@@ -1,0 +1,3 @@
+-- DB Schema (DDL snapshot)
+-- Source of truth export from Supabase will be pasted here in C1-1.
+-- Do not hand-edit beyond this header; prefer adding diffs in db/CHANGES/*.sql
