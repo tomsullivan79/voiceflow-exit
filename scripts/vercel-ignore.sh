@@ -19,19 +19,31 @@ if echo "$MSG" | grep -qi "Auto-generate db/SCHEMA.md"; then
   echo "skip: schema auto-commit (subject match)"
   exit 0
 fi
+if echo "$MSG" | grep -qi "Auto-generate assistant/data-model.md"; then
+  echo "skip: data-model auto-commit (subject match)"
+  exit 0
+fi
 
 # C) Skip commits that changed only known doc files
 if CHANGED=$(git diff-tree --no-commit-id --name-only -r "$SHA" 2>/dev/null); then
   # normalize to single-line space-separated list
   LIST=$(echo "$CHANGED" | tr '\n' ' ' | xargs)
+
   # only ASSISTANT_SNAPSHOT.md
   if [ "$LIST" = "ASSISTANT_SNAPSHOT.md" ]; then
     echo "skip: only ASSISTANT_SNAPSHOT.md changed"
     exit 0
   fi
+
   # only db/SCHEMA.md
   if [ "$LIST" = "db/SCHEMA.md" ]; then
     echo "skip: only db/SCHEMA.md changed"
+    exit 0
+  fi
+
+  # only assistant/data-model.md  <-- NEW
+  if [ "$LIST" = "assistant/data-model.md" ]; then
+    echo "skip: only assistant/data-model.md changed"
     exit 0
   fi
 fi

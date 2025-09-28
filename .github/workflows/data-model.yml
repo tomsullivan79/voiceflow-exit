@@ -1,0 +1,35 @@
+name: Generate assistant/data-model.md from db/SCHEMA.sql
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "db/SCHEMA.sql"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-data-model:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Generate assistant/data-model.md
+        run: node scripts/data-model-from-sql.mjs
+
+      - name: Commit data-model.md
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "[skip ci][ci skip] C1-3: Auto-generate assistant/data-model.md from db/SCHEMA.sql"
+          branch: main
+          file_pattern: assistant/data-model.md
