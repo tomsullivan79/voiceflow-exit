@@ -6,7 +6,7 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: fa7bc0f — A1-2-robust: tolerant label match + diff log for snapshot updater
+- **Latest commit**: 4e122ae — A1-2: Auto-update Assistant Snapshot (commit + CT time + app tree)
 - **Updated (America/Chicago)**: 2025-09-27 19:03 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
