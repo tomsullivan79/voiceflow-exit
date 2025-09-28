@@ -1,0 +1,31 @@
+# .github/workflows/assistant-snapshot.yml
+name: Update Assistant Snapshot
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  update-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Update ASSISTANT_SNAPSHOT.md
+        run: node scripts/update-assistant-snapshot.mjs
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "A1-2: Auto-update Assistant Snapshot (commit + CT time + app tree)"
+          branch: main
+          file_pattern: ASSISTANT_SNAPSHOT.md
