@@ -4,20 +4,37 @@ set -euo pipefail
 MSG="${VERCEL_GIT_COMMIT_MESSAGE:-}"
 SHA="${VERCEL_GIT_COMMIT_SHA:-}"
 
-# 1) If the message is the snapshot bot commit → skip
-if echo "$MSG" | grep -qi "Auto-update Assistant Snapshot"; then
-  echo "skip: snapshot auto-commit (message match)"
+# A) Respect common skip tokens in commit message
+if echo "$MSG" | grep -qiE '\[skip ci\]|\[ci skip\]'; then
+  echo "skip: commit message has [skip ci]/[ci skip]"
   exit 0
 fi
 
-# 2) If this commit only changed the snapshot file → skip
-# (The build environment has a Git checkout, so this works.)
+# B) Skip known bot commits by subject
+if echo "$MSG" | grep -qi "Auto-update Assistant Snapshot"; then
+  echo "skip: snapshot auto-commit (subject match)"
+  exit 0
+fi
+if echo "$MSG" | grep -qi "Auto-generate db/SCHEMA.md"; then
+  echo "skip: schema auto-commit (subject match)"
+  exit 0
+fi
+
+# C) Skip commits that changed only known doc files
 if CHANGED=$(git diff-tree --no-commit-id --name-only -r "$SHA" 2>/dev/null); then
-  if [ "$(echo "$CHANGED" | wc -w | tr -d ' ')" = "1" ] && [ "$CHANGED" = "ASSISTANT_SNAPSHOT.md" ]; then
-    echo "skip: snapshot auto-commit (only ASSISTANT_SNAPSHOT.md changed)"
+  # normalize to single-line space-separated list
+  LIST=$(echo "$CHANGED" | tr '\n' ' ' | xargs)
+  # only ASSISTANT_SNAPSHOT.md
+  if [ "$LIST" = "ASSISTANT_SNAPSHOT.md" ]; then
+    echo "skip: only ASSISTANT_SNAPSHOT.md changed"
+    exit 0
+  fi
+  # only db/SCHEMA.md
+  if [ "$LIST" = "db/SCHEMA.md" ]; then
+    echo "skip: only db/SCHEMA.md changed"
     exit 0
   fi
 fi
 
-# Otherwise: do NOT print anything → Vercel will proceed with the build
+# Otherwise: build proceeds (print nothing and exit non-zero)
 exit 1

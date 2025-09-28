@@ -368,7 +368,7 @@ $$;
 
 
 -- ============================
--- Enums / Types
+-- Enums / Types (adding a comment here for testing 123)
 -- ============================
 -- Application-defined enums in the app schema (`public`): NONE as of 2025-09-28.
 -- (The enums below live in Supabase-managed schemas and are listed here ONLY for reference.)
