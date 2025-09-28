@@ -6,7 +6,7 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: dfb0107 — A1-2: Auto-update Assistant Snapshot (commit + CT time + app tree)
+- **Latest commit**: f560ed6 — C1-0: Add db/ schema skeleton (SCHEMA.md, SCHEMA.sql, CHANGES/)
 - **Updated (America/Chicago)**: 2025-09-27 19:03 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
@@ -83,6 +83,12 @@ public/
   next.svg
   vercel.svg
   window.svg
+db/
+  CHANGES/
+    .gitkeep
+    README.md
+  SCHEMA.md
+  SCHEMA.sql
 docs/
   PROJECT_STATE.md
   WORKING_AGREEMENTS.md
