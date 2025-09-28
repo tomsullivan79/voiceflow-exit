@@ -1,0 +1,49 @@
+name: Sync schema docs from SCHEMA.sql
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "db/SCHEMA.sql"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-commit-main
+  cancel-in-progress: false
+
+jobs:
+  sync-schema-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Generate db/SCHEMA.md
+        run: node scripts/schema-md-from-sql.mjs
+
+      - name: Generate assistant/data-model.md
+        run: node scripts/data-model-from-sql.mjs
+
+      - name: Show diff
+        run: |
+          git --no-pager status --porcelain
+          git --no-pager diff --name-only -- db/SCHEMA.md assistant/data-model.md || true
+
+      - name: Commit both schema docs
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "[skip ci][ci skip] C1-sync: Auto-generate schema docs"
+          branch: main
+          file_pattern: |
+            db/SCHEMA.md
+            assistant/data-model.md
