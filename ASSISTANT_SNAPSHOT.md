@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 8918638 — C1-2: add generator for db/SCHEMA.md + CI to auto-update on schema changes
-- **Updated (America/Chicago)**: 2025-09-28 16:18 CT
+- **Latest commit**: ae7a9ec — C1-3: add generator + CI for assistant/data-model.md; extend Vercel ignore
+- **Updated (America/Chicago)**: 2025-09-28 16:50 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -122,6 +122,7 @@ package.json
 scripts/
   convert_species_yaml.cjs
   convert_species_yaml.ts
+  data-model-from-sql.mjs
   loose_merge_from_txt.cjs
   merge_species.ts
   schema-md-from-sql.mjs
