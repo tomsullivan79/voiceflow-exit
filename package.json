@@ -26,8 +26,10 @@
     "@types/ws": "^8.18.1",
     "eslint": "^9",
     "eslint-config-next": "15.5.3",
+    "ts-node": "^10.9.2",
     "tsx": "^4.20.5",
-    "typescript": "^5",
-    "ws": "^8.18.3"
+    "typescript": "^5.9.2",
+    "ws": "^8.18.3",
+    "yaml": "^2.8.1"
   }
 }
