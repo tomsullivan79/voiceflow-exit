@@ -1,9 +1,12 @@
-# .github/workflows/assistant-snapshot.yml
 name: Update Assistant Snapshot
 
 on:
   push:
     branches: [ "main" ]
+    # If a push only changes the snapshot file (i.e., the bot's commit),
+    # don't run this workflow again.
+    paths-ignore:
+      - "ASSISTANT_SNAPSHOT.md"
   workflow_dispatch:
 
 permissions:
@@ -32,6 +35,7 @@ jobs:
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "A1-2: Auto-update Assistant Snapshot (commit + CT time + app tree)"
+          # [skip ci] prevents Vercel (and most CI) from deploying on this bot commit.
+          commit_message: "[skip ci] A1-2: Auto-update Assistant Snapshot (commit + CT time + app tree)"
           branch: main
           file_pattern: ASSISTANT_SNAPSHOT.md

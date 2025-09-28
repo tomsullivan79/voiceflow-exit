@@ -5,27 +5,27 @@ import { join } from "node:path";
 
 const SNAPSHOT_PATH = join(process.cwd(), "ASSISTANT_SNAPSHOT.md");
 
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+function getLatestHumanCommit() {
+  // Look back a few commits and pick the first non-bot author.
+  const raw = execSync('git log -n 15 --pretty=format:%h|%an|%s', { encoding: "utf8" }).trim();
+  const line = raw.split("\n").find(l => !l.includes("github-actions[bot]")) || raw.split("\n")[0];
+  const [shortSha, author, subject] = line.split("|");
+  return { shortSha, subject };
 }
 
-function getLatestCommit() {
-  const raw = execSync('git log -1 --pretty=format:%h%n%s%n%aI', { encoding: "utf8" }).trim();
-  const [shortSha, subject] = raw.split("\n");
-
+function currentCT() {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Chicago",
     year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", hour12: false,
   }).formatToParts(new Date()).reduce((acc, p) => ((acc[p.type] = p.value), acc), {});
-  const updatedCT = `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute} CT`;
-
-  return { shortSha, subject, updatedCT };
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute} CT`;
 }
 
 const EXCLUDE = new Set([
-  ".git", ".github", ".vscode", ".next", ".vercel",
-  "node_modules", "dist", "build", "out", ".turbo", "coverage",
+  ".git",".github",".vscode",".next",".vercel","node_modules","dist","build","out",".turbo","coverage",
 ]);
 
 function buildTree(rootDir, maxDepth = 2) {
@@ -33,9 +33,7 @@ function buildTree(rootDir, maxDepth = 2) {
     if (depth < 0) return [];
     let entries = [];
     try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return []; }
-    entries.sort((a, b) => (a.isDirectory() === b.isDirectory())
-      ? a.name.localeCompare(b.name)
-      : a.isDirectory() ? -1 : 1);
+    entries.sort((a, b) => (a.isDirectory() === b.isDirectory()) ? a.name.localeCompare(b.name) : a.isDirectory() ? -1 : 1);
     const lines = [];
     for (const e of entries) {
       if (EXCLUDE.has(e.name)) continue;
@@ -45,19 +43,13 @@ function buildTree(rootDir, maxDepth = 2) {
     }
     return lines;
   }
-
-  const preferred = ["app", "components", "lib", "public", "db", "docs", "assistant"];
+  const preferred = ["app","components","lib","public","db","docs","assistant"];
   let top = [];
-  try {
-    top = readdirSync(rootDir, { withFileTypes: true })
-      .filter((e) => !EXCLUDE.has(e.name))
-      .map((e) => ({ name: e.name, isDir: e.isDirectory() }));
-  } catch {}
+  try { top = readdirSync(rootDir, { withFileTypes: true }).filter(e => !EXCLUDE.has(e.name)).map(e => ({ name: e.name, isDir: e.isDirectory() })); } catch {}
   const ordered = [
-    ...preferred.filter((n) => top.find((e) => e.name === n)).map((n) => ({ name: n, isDir: true })),
-    ...top.filter((e) => !preferred.includes(e.name)),
+    ...preferred.filter(n => top.find(e => e.name === n)).map(n => ({ name: n, isDir: true })),
+    ...top.filter(e => !preferred.includes(e.name)),
   ];
-
   const lines = [];
   for (const e of ordered) {
     const full = join(rootDir, e.name);
@@ -67,18 +59,14 @@ function buildTree(rootDir, maxDepth = 2) {
   return lines.join("\n");
 }
 
-// Replace anything after "**<label>**:" on the FIRST occurrence, regardless of bullets/spacing
+// Replace text after a bold label, inserting if missing.
 function replaceAfterLabel(md, label, replacement) {
   const re = new RegExp(`(\\*\\*${escapeRegExp(label)}\\*\\*\\s*:\\s*)(.*)`);
   if (re.test(md)) return md.replace(re, `$1${replacement}`);
-  // If not found, insert under "## Repo & Build"
   const lines = md.split(/\r?\n/);
-  const anchor = lines.findIndex((l) => l.trim() === "## Repo & Build");
+  const anchor = lines.findIndex(l => l.trim() === "## Repo & Build");
   const insertion = `- **${label}**: ${replacement}`;
-  if (anchor !== -1) {
-    lines.splice(anchor + 1, 0, insertion);
-    return lines.join("\n");
-  }
+  if (anchor !== -1) { lines.splice(anchor + 1, 0, insertion); return lines.join("\n"); }
   return insertion + "\n" + md;
 }
 
@@ -105,9 +93,10 @@ if (!existsSync(SNAPSHOT_PATH)) {
 
 let src = readFileSync(SNAPSHOT_PATH, "utf8").replace(/\r\n/g, "\n");
 
-const { shortSha, subject, updatedCT } = getLatestCommit();
-let next = src;
+const { shortSha, subject } = getLatestHumanCommit();
+const updatedCT = currentCT();
 
+let next = src;
 next = replaceAfterLabel(next, "Latest commit", `${shortSha} — ${subject}`);
 next = replaceAfterLabel(next, "Updated (America/Chicago)", updatedCT);
 
