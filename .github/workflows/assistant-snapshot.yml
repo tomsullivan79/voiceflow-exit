@@ -35,7 +35,6 @@ jobs:
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          # [skip ci] prevents Vercel (and most CI) from deploying on this bot commit.
-          commit_message: "[skip ci] A1-2: Auto-update Assistant Snapshot (commit + CT time + app tree)"
+          commit_message: "[skip ci][ci skip] A1-2: Auto-update Assistant Snapshot (commit + CT time + app tree)"
           branch: main
           file_pattern: ASSISTANT_SNAPSHOT.md
