@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 3bf05c3 — chore(vercel): ignore snapshot-only commits; add [skip ci][ci skip]
-- **Updated (America/Chicago)**: 2025-09-28 15:32 CT
+- **Latest commit**: 973fed5 — B1: add /api/version and /version page (commit + built_at CT) AND add /version verification step to ritual
+- **Updated (America/Chicago)**: 2025-09-28 15:48 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -31,6 +31,7 @@ app/
     ingest/
     memories/
     sms/
+    version/
     web-chat/
   auth/
     callback/
@@ -56,6 +57,8 @@ app/
     [sid]/
     page.tsx
   terms/
+    page.tsx
+  version/
     page.tsx
   whoami/
     page.tsx
