@@ -5,15 +5,16 @@ on:
     branches: [ "main" ]
     paths-ignore:
       - "ASSISTANT_SNAPSHOT.md"
-      - "db/SCHEMA.md"                # NEW: ignore schema generator commits
-      - "assistant/data-model.md"     # NEW: ignore data-model generator commits
+      - "db/SCHEMA.md"
+      - "assistant/data-model.md"
   workflow_dispatch:
 
 permissions:
   contents: write
 
+# serialize with other auto-commit jobs so they don't run in parallel
 concurrency:
-  group: auto-commit-main             # NEW: serialize with other auto-commit jobs
+  group: auto-commit-main
   cancel-in-progress: false
 
 jobs:
@@ -22,21 +23,50 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with:
+          node-version: "20"
 
       - name: Update ASSISTANT_SNAPSHOT.md
         run: node scripts/update-assistant-snapshot.mjs
 
-      - name: Show diff
-        run: git --no-pager diff -- ASSISTANT_SNAPSHOT.md || true
+      - name: Detect changes
+        id: diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- ASSISTANT_SNAPSHOT.md; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No changes in ASSISTANT_SNAPSHOT.md."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Changes detected in ASSISTANT_SNAPSHOT.md"
+          fi
 
-      - name: Commit changes
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "[skip ci][ci skip] A1-2: Auto-update Assistant Snapshot (commit + CT time + app tree)"
-          branch: main
-          file_pattern: ASSISTANT_SNAPSHOT.md
+      - name: Commit & push with rebase (and safe fallback)
+        if: steps.diff.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add ASSISTANT_SNAPSHOT.md
+          git commit -m "[skip ci][ci skip] A1-2: Auto-update Assistant Snapshot (commit + CT time + app tree)" || {
+            echo "Nothing to commit after add."; exit 0;
+          }
+
+          # Try clean rebase push first
+          git pull --rebase origin main || true
+          git push && exit 0
+
+          # Retry once in case another job pushed in between
+          git pull --rebase origin main || true
+          git push && exit 0
+
+          # Last resort for rewritten/advanced main: safe force
+          git push --force-with-lease
