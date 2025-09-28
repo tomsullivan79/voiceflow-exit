@@ -3,14 +3,18 @@ name: Update Assistant Snapshot
 on:
   push:
     branches: [ "main" ]
-    # If a push only changes the snapshot file (i.e., the bot's commit),
-    # don't run this workflow again.
     paths-ignore:
       - "ASSISTANT_SNAPSHOT.md"
+      - "db/SCHEMA.md"                # NEW: ignore schema generator commits
+      - "assistant/data-model.md"     # NEW: ignore data-model generator commits
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: auto-commit-main             # NEW: serialize with other auto-commit jobs
+  cancel-in-progress: false
 
 jobs:
   update-snapshot:
@@ -18,13 +22,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        with: { fetch-depth: 0 }
 
       - name: Setup Node
         uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+        with: { node-version: "20" }
 
       - name: Update ASSISTANT_SNAPSHOT.md
         run: node scripts/update-assistant-snapshot.mjs
