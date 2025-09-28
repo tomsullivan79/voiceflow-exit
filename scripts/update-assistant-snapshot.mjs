@@ -5,22 +5,18 @@ import { join } from "node:path";
 
 const SNAPSHOT_PATH = join(process.cwd(), "ASSISTANT_SNAPSHOT.md");
 
-// --- Helpers ---------------------------------------------------------------
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 function getLatestCommit() {
-  // Latest *human* commit (the one that triggered the run)
   const raw = execSync('git log -1 --pretty=format:%h%n%s%n%aI', { encoding: "utf8" }).trim();
-  const [shortSha, subject/*, isoDate*/] = raw.split("\n");
+  const [shortSha, subject] = raw.split("\n");
 
-  // Current CT time as "YYYY-MM-DD HH:mm CT"
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Chicago",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
   }).formatToParts(new Date()).reduce((acc, p) => ((acc[p.type] = p.value), acc), {});
   const updatedCT = `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute} CT`;
 
@@ -37,11 +33,9 @@ function buildTree(rootDir, maxDepth = 2) {
     if (depth < 0) return [];
     let entries = [];
     try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return []; }
-    entries.sort((a, b) => {
-      if (a.isDirectory() && !b.isDirectory()) return -1;
-      if (!a.isDirectory() && b.isDirectory()) return 1;
-      return a.name.localeCompare(b.name);
-    });
+    entries.sort((a, b) => (a.isDirectory() === b.isDirectory())
+      ? a.name.localeCompare(b.name)
+      : a.isDirectory() ? -1 : 1);
     const lines = [];
     for (const e of entries) {
       if (EXCLUDE.has(e.name)) continue;
@@ -53,10 +47,12 @@ function buildTree(rootDir, maxDepth = 2) {
   }
 
   const preferred = ["app", "components", "lib", "public", "db", "docs", "assistant"];
-  const top = readdirSync(rootDir, { withFileTypes: true })
-    .filter((e) => !EXCLUDE.has(e.name))
-    .map((e) => ({ name: e.name, isDir: e.isDirectory() }));
-
+  let top = [];
+  try {
+    top = readdirSync(rootDir, { withFileTypes: true })
+      .filter((e) => !EXCLUDE.has(e.name))
+      .map((e) => ({ name: e.name, isDir: e.isDirectory() }));
+  } catch {}
   const ordered = [
     ...preferred.filter((n) => top.find((e) => e.name === n)).map((n) => ({ name: n, isDir: true })),
     ...top.filter((e) => !preferred.includes(e.name)),
@@ -65,34 +61,22 @@ function buildTree(rootDir, maxDepth = 2) {
   const lines = [];
   for (const e of ordered) {
     const full = join(rootDir, e.name);
-    if (!existsSync(full)) continue;
     lines.push(`${e.name}${e.isDir ? "/" : ""}`);
     if (e.isDir) lines.push(...walk(full, maxDepth - 1, "  "));
   }
   return lines.join("\n");
 }
 
-function replaceLineFlexible(md, label, replacement) {
-  // Allow leading spaces, dash or asterisk bullet, any amount of spacing before colon
-  const re = new RegExp(`^[ \\t]*[-*]\\s+\\*\\*${label}\\*\\*\\s*:\\s*.*$`, "m");
-  if (re.test(md)) return md.replace(re, `- **${label}**: ${replacement}`);
-  return md;
-}
-
-function ensureLineExists(md, label, fallbackValue, insertAfterLabel = "Default branch") {
-  // If the labeled line isn't present anywhere, insert it one line after the insertAfterLabel line
-  if (md.includes(`**${label}**`)) return md;
+// Replace anything after "**<label>**:" on the FIRST occurrence, regardless of bullets/spacing
+function replaceAfterLabel(md, label, replacement) {
+  const re = new RegExp(`(\\*\\*${escapeRegExp(label)}\\*\\*\\s*:\\s*)(.*)`);
+  if (re.test(md)) return md.replace(re, `$1${replacement}`);
+  // If not found, insert under "## Repo & Build"
   const lines = md.split(/\r?\n/);
-  const idx = lines.findIndex(l => l.includes(`**${insertAfterLabel}**`));
-  const insertion = `- **${label}**: ${fallbackValue}`;
-  if (idx !== -1) {
-    lines.splice(idx + 1, 0, insertion);
-    return lines.join("\n");
-  }
-  // If we can't find the anchor, append near the top
-  const headerIdx = lines.findIndex(l => l.startsWith("## Repo & Build"));
-  if (headerIdx !== -1) {
-    lines.splice(headerIdx + 1, 0, insertion);
+  const anchor = lines.findIndex((l) => l.trim() === "## Repo & Build");
+  const insertion = `- **${label}**: ${replacement}`;
+  if (anchor !== -1) {
+    lines.splice(anchor + 1, 0, insertion);
     return lines.join("\n");
   }
   return insertion + "\n" + md;
@@ -101,42 +85,31 @@ function ensureLineExists(md, label, fallbackValue, insertAfterLabel = "Default 
 function replaceAppTree(md, newTree) {
   const headerIdx = md.indexOf("## App Tree");
   if (headerIdx === -1) return md;
-
   const afterHeader = md.slice(headerIdx);
   const firstFence = afterHeader.indexOf("```");
   if (firstFence === -1) return md;
-
   const start = headerIdx + firstFence;
   const rest = md.slice(start + 3);
   const secondFence = rest.indexOf("```");
   if (secondFence === -1) return md;
-
   const before = md.slice(0, start);
   const after = rest.slice(secondFence + 3);
   const newBlock = "```text\n" + newTree + "\n```";
   return before + newBlock + after;
 }
 
-// --- Main -----------------------------------------------------------------
-
 if (!existsSync(SNAPSHOT_PATH)) {
   console.error("ASSISTANT_SNAPSHOT.md not found at repo root.");
   process.exit(1);
 }
 
-let src = readFileSync(SNAPSHOT_PATH, "utf8");
-
-// Normalize EOLs to avoid false negatives
-src = src.replace(/\r\n/g, "\n");
+let src = readFileSync(SNAPSHOT_PATH, "utf8").replace(/\r\n/g, "\n");
 
 const { shortSha, subject, updatedCT } = getLatestCommit();
-
 let next = src;
-next = replaceLineFlexible(next, "Latest commit", `${shortSha} — ${subject}`);
-next = ensureLineExists(next, "Latest commit", `${shortSha} — ${subject}`);
 
-next = replaceLineFlexible(next, "Updated (America/Chicago)", updatedCT);
-next = ensureLineExists(next, "Updated (America/Chicago)", updatedCT);
+next = replaceAfterLabel(next, "Latest commit", `${shortSha} — ${subject}`);
+next = replaceAfterLabel(next, "Updated (America/Chicago)", updatedCT);
 
 const tree = buildTree(process.cwd(), 2);
 next = replaceAppTree(next, tree);
