@@ -6,7 +6,7 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: ef47f98 — A1-3: Add /assistant bundle (snapshot, routes, data-model, policy, notes, experiments)
+- **Latest commit**: dfb0107 — A1-2: Auto-update Assistant Snapshot (commit + CT time + app tree)
 - **Updated (America/Chicago)**: 2025-09-27 19:03 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
