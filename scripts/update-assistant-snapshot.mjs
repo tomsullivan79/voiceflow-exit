@@ -1,5 +1,5 @@
 // scripts/update-assistant-snapshot.mjs
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -9,31 +9,33 @@ function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 
 function getLatestHumanCommit() {
   // Look back a few commits and pick the first non-bot author.
-  const raw = execSync('git log -n 15 --pretty=format:%h|%an|%s', { encoding: "utf8" }).trim();
-  const line = raw.split("\n").find(l => !l.includes("github-actions[bot]")) || raw.split("\n")[0];
-  const [shortSha, author, subject] = line.split("|");
+  const raw = execFileSync(
+    "git",
+    ["log", "-n", "15", "--pretty=format:%h|%an|%s"],
+    { encoding: "utf8" }
+  ).trim();
+  const line = raw.split("\n").find(l => !l.includes("github-actions[bot]")) || raw.split("\n")[0] || "";
+  const [shortSha = "", author = "", subject = ""] = line.split("|");
   return { shortSha, subject };
 }
 
 function currentCT() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
+  const p = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Chicago",
     year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", hour12: false,
-  }).formatToParts(new Date()).reduce((acc, p) => ((acc[p.type] = p.value), acc), {});
-  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute} CT`;
+  }).formatToParts(new Date()).reduce((a, x) => ((a[x.type] = x.value), a), {});
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute} CT`;
 }
 
-const EXCLUDE = new Set([
-  ".git",".github",".vscode",".next",".vercel","node_modules","dist","build","out",".turbo","coverage",
-]);
+const EXCLUDE = new Set([".git",".github",".vscode",".next",".vercel","node_modules","dist","build","out",".turbo","coverage"]);
 
 function buildTree(rootDir, maxDepth = 2) {
   function walk(dir, depth, prefix = "") {
     if (depth < 0) return [];
     let entries = [];
     try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return []; }
-    entries.sort((a, b) => (a.isDirectory() === b.isDirectory()) ? a.name.localeCompare(b.name) : a.isDirectory() ? -1 : 1);
+    entries.sort((a,b) => (a.isDirectory()===b.isDirectory()) ? a.name.localeCompare(b.name) : a.isDirectory() ? -1 : 1);
     const lines = [];
     for (const e of entries) {
       if (EXCLUDE.has(e.name)) continue;
@@ -45,9 +47,9 @@ function buildTree(rootDir, maxDepth = 2) {
   }
   const preferred = ["app","components","lib","public","db","docs","assistant"];
   let top = [];
-  try { top = readdirSync(rootDir, { withFileTypes: true }).filter(e => !EXCLUDE.has(e.name)).map(e => ({ name: e.name, isDir: e.isDirectory() })); } catch {}
+  try { top = readdirSync(rootDir, { withFileTypes: true }).filter(e => !EXCLUDE.has(e.name)).map(e => ({ name:e.name, isDir:e.isDirectory() })); } catch {}
   const ordered = [
-    ...preferred.filter(n => top.find(e => e.name === n)).map(n => ({ name: n, isDir: true })),
+    ...preferred.filter(n => top.find(e => e.name===n)).map(n => ({ name:n, isDir:true })),
     ...top.filter(e => !preferred.includes(e.name)),
   ];
   const lines = [];
@@ -59,7 +61,6 @@ function buildTree(rootDir, maxDepth = 2) {
   return lines.join("\n");
 }
 
-// Replace text after a bold label, inserting if missing.
 function replaceAfterLabel(md, label, replacement) {
   const re = new RegExp(`(\\*\\*${escapeRegExp(label)}\\*\\*\\s*:\\s*)(.*)`);
   if (re.test(md)) return md.replace(re, `$1${replacement}`);
