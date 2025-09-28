@@ -6,7 +6,7 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: b1003c6 — added schema.sql and data-model.md
+- **Latest commit**: d833700 — A1-2: Auto-update Assistant Snapshot (commit + CT time + app tree)
 - **Updated (America/Chicago)**: 2025-09-27 19:03 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
