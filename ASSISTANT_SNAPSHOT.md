@@ -6,7 +6,7 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 0b5256b — A1-1: Add Assistant Snapshot skeleton + Working Agreements + Project State
+- **Latest commit**: 80905fa — A1-2 (redo): Add workflow + script to auto-update Assistant Snapshot
 - **Updated (America/Chicago)**: 2025-09-27 19:03 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
@@ -18,15 +18,98 @@
 *(Keep this concise; we will automate refresh in A1-2)*
 ```text
 app/
+  admin/
+    env/
+    species/
   api/
+    admin/
+    auth/
+    cases/
+    chat/
+    debug/
+    health/
+    ingest/
+    memories/
+    sms/
+    web-chat/
+  auth/
+    callback/
+    auth-client.tsx
+    page.tsx
   cases/
-  sms/
+    [id]/
+    AutoRefresher.tsx
+    page.tsx
+    RealtimeCasesListListener.tsx
+    RefreshListClient.tsx
   chat/
+    page.tsx
+    PolicyBanner.tsx
+  ingest/
+    page.tsx
+  memories/
+    client-list.tsx
+    page.tsx
+  privacy/
+    page.tsx
+  sms/
+    [sid]/
+    page.tsx
+  terms/
+    page.tsx
+  whoami/
+    page.tsx
+  favicon.ico
+  globals.css
+  layout.tsx
+  page.backup.tsx
+  page.module.css
+  page.tsx
+  styles.css
 components/
+  BrandHeader.tsx
 lib/
+  chunk.ts
+  policy.ts
+  supabaseAdmin.ts
+  supabaseBrowser.ts
+  supabaseServer.ts
+  supabaseServerAuth.ts
+  twilio.ts
 public/
-db/              # schema snapshots live here when present
-docs/            # working agreements & project state
+  file.svg
+  globe.svg
+  Green_Sage.png
+  next.svg
+  vercel.svg
+  window.svg
+docs/
+  PROJECT_STATE.md
+  WORKING_AGREEMENTS.md
+.env.example
+.gitignore
+ASSISTANT_SNAPSHOT.md
+README.md
+White_Sage.png
+data/
+  raw/
+    species-meta-lookup.yaml
+    species-meta.yaml
+eslint.config.mjs
+next-env.d.ts
+next.config.js
+next.config.ts
+package-lock.json
+package.json
+scripts/
+  convert_species_yaml.cjs
+  convert_species_yaml.ts
+  loose_merge_from_txt.cjs
+  merge_species.ts
+  update-assistant-snapshot.mjs
+tsconfig.json
+types/
+  species.ts
 ```
 
 ---
