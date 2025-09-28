@@ -7,7 +7,7 @@
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
 - **Latest commit**: 973fed5 — B1: add /api/version and /version page (commit + built_at CT) AND add /version verification step to ritual
-- **Updated (America/Chicago)**: 2025-09-28 15:48 CT
+- **Updated (America/Chicago)**: 2025-09-28 15:51 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
