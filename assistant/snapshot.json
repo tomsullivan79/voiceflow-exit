@@ -1,0 +1,44 @@
+{
+  "project": "WildTriage",
+  "repo": "https://github.com/tomsullivan79/voiceflow-exit",
+  "prodUrl": "https://app.wildtriage.org/",
+  "timezone": "America/Chicago",
+  "env": [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE",
+    "WEB_CHAT_OWNER_USER_ID",
+    "TWILIO_ACCOUNT_SID",
+    "TWILIO_AUTH_TOKEN",
+    "TWILIO_MESSAGING_SERVICE_SID"
+  ],
+  "flags": {
+    "DISABLE_OUTBOUND_SMS": true
+  },
+  "routes": [
+    "/api/web-chat/message",
+    "/api/web-chat/assistant",
+    "/api/chat",
+    "/api/sms/status",
+    "/api/sms/twilio",
+    "/api/pack/integrity",
+    "/api/version"
+  ],
+  "ui": {
+    "pages": [
+      "/",
+      "/chat",
+      "/cases",
+      "/cases/[id]",
+      "/sms",
+      "/sms/[sid]",
+      "/terms",
+      "/privacy"
+    ],
+    "branding": {
+      "lightAvatar": "/public/Green_Sage.png",
+      "darkAvatar": "/public/White_Sage.png",
+      "primaryColor": "#6DAF75"
+    }
+  }
+}
