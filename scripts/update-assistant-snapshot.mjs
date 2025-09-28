@@ -7,16 +7,27 @@ const SNAPSHOT_PATH = join(process.cwd(), "ASSISTANT_SNAPSHOT.md");
 
 function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 
-function getLatestHumanCommit() {
-  // Look back a few commits and pick the first non-bot author.
-  const raw = execFileSync(
-    "git",
-    ["log", "-n", "15", "--pretty=format:%h|%an|%s"],
-    { encoding: "utf8" }
-  ).trim();
-  const line = raw.split("\n").find(l => !l.includes("github-actions[bot]")) || raw.split("\n")[0] || "";
-  const [shortSha = "", author = "", subject = ""] = line.split("|");
-  return { shortSha, subject };
+function git(args) {
+  return execFileSync("git", args, { encoding: "utf8" }).trim();
+}
+
+function latestHumanCommit() {
+  // Look back a bit and pick the first commit that isn't the snapshot-only auto-commit.
+  const log = git(["log", "-n", "30", "--pretty=format:%h|%s"]);
+  for (const line of log.split("\n")) {
+    const [sha, subject = ""] = line.split("|");
+    if (/Auto-update Assistant Snapshot/i.test(subject)) continue;
+
+    // What files changed in this commit?
+    const files = git(["diff-tree", "--no-commit-id", "--name-only", "-r", sha]).split("\n").filter(Boolean);
+    const onlySnapshot = files.length === 1 && files[0] === "ASSISTANT_SNAPSHOT.md";
+    if (onlySnapshot) continue;
+
+    return { sha, subject };
+  }
+  // Fallback: first line
+  const [sha = "", subject = ""] = (log.split("\n")[0] || "").split("|");
+  return { sha, subject };
 }
 
 function currentCT() {
@@ -61,6 +72,7 @@ function buildTree(rootDir, maxDepth = 2) {
   return lines.join("\n");
 }
 
+// Replace text after a bold label, inserting if missing.
 function replaceAfterLabel(md, label, replacement) {
   const re = new RegExp(`(\\*\\*${escapeRegExp(label)}\\*\\*\\s*:\\s*)(.*)`);
   if (re.test(md)) return md.replace(re, `$1${replacement}`);
@@ -71,22 +83,6 @@ function replaceAfterLabel(md, label, replacement) {
   return insertion + "\n" + md;
 }
 
-function replaceAppTree(md, newTree) {
-  const headerIdx = md.indexOf("## App Tree");
-  if (headerIdx === -1) return md;
-  const afterHeader = md.slice(headerIdx);
-  const firstFence = afterHeader.indexOf("```");
-  if (firstFence === -1) return md;
-  const start = headerIdx + firstFence;
-  const rest = md.slice(start + 3);
-  const secondFence = rest.indexOf("```");
-  if (secondFence === -1) return md;
-  const before = md.slice(0, start);
-  const after = rest.slice(secondFence + 3);
-  const newBlock = "```text\n" + newTree + "\n```";
-  return before + newBlock + after;
-}
-
 if (!existsSync(SNAPSHOT_PATH)) {
   console.error("ASSISTANT_SNAPSHOT.md not found at repo root.");
   process.exit(1);
@@ -94,15 +90,29 @@ if (!existsSync(SNAPSHOT_PATH)) {
 
 let src = readFileSync(SNAPSHOT_PATH, "utf8").replace(/\r\n/g, "\n");
 
-const { shortSha, subject } = getLatestHumanCommit();
+const { sha, subject } = latestHumanCommit();
 const updatedCT = currentCT();
 
 let next = src;
-next = replaceAfterLabel(next, "Latest commit", `${shortSha} — ${subject}`);
+next = replaceAfterLabel(next, "Latest commit", `${sha} — ${subject}`);
 next = replaceAfterLabel(next, "Updated (America/Chicago)", updatedCT);
 
 const tree = buildTree(process.cwd(), 2);
-next = replaceAppTree(next, tree);
+next = (() => {
+  const idx = next.indexOf("## App Tree");
+  if (idx === -1) return next;
+  const after = next.slice(idx);
+  const firstFence = after.indexOf("```");
+  if (firstFence === -1) return next;
+  const start = idx + firstFence;
+  const rest = next.slice(start + 3);
+  const secondFence = rest.indexOf("```");
+  if (secondFence === -1) return next;
+  const before = next.slice(0, start);
+  const tail = rest.slice(secondFence + 3);
+  const block = "```text\n" + tree + "\n```";
+  return before + block + tail;
+})();
 
 if (next !== src) {
   writeFileSync(SNAPSHOT_PATH, next, "utf8");
