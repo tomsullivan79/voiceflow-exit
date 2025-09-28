@@ -6,7 +6,7 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 80905fa — A1-2 (redo): Add workflow + script to auto-update Assistant Snapshot
+- **Latest commit**: ef47f98 — A1-3: Add /assistant bundle (snapshot, routes, data-model, policy, notes, experiments)
 - **Updated (America/Chicago)**: 2025-09-27 19:03 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
@@ -91,6 +91,14 @@ docs/
 ASSISTANT_SNAPSHOT.md
 README.md
 White_Sage.png
+assistant/
+  data-model.md
+  experiments.md
+  policy.md
+  README.md
+  routes.md
+  snapshot.json
+  species-meta-notes.md
 data/
   raw/
     species-meta-lookup.yaml
