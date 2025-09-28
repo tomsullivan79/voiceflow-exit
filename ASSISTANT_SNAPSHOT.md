@@ -180,6 +180,8 @@ types/
 1. Confirm latest commit SHA and time against this file and (if relevant) `/api/version`.
 2. Read **docs/WORKING_AGREEMENTS.md** and **docs/PROJECT_STATE.md**.
 3. Follow the contract: one tiny step → full drop-ins → git cmds → Test & Verify → next-step options.
+4. Verify /api/version or /version in prod shows the same short SHA as **Latest commit** above.
+
 
 ---
 
