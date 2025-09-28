@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 2f8c077 — fix: use execFileSync for git log; avoid % parsing in shell
-- **Updated (America/Chicago)**: 2025-09-28 15:06 CT
+- **Latest commit**: d48bea5 — [skip ci] A1-2: Auto-update Assistant Snapshot (commit + CT time + app tree)
+- **Updated (America/Chicago)**: 2025-09-28 15:09 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
