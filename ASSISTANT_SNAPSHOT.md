@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: fa5031e — test(schema): trigger schema-sync + snapshot
-- **Updated (America/Chicago)**: 2025-09-28 17:34 CT
+- **Latest commit**: 650eb44 — C2: establish db/CHANGES/ convention + README (SQL audit trail)
+- **Updated (America/Chicago)**: 2025-09-28 18:38 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -90,6 +90,7 @@ public/
 db/
   CHANGES/
     .gitkeep
+    2025-09-28__example.sql
     README.md
   SCHEMA.md
   SCHEMA.sql
