@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: e4052df — ci: unify schema generators into one workflow to avoid commit races
-- **Updated (America/Chicago)**: 2025-09-28 17:15 CT
+- **Latest commit**: 8666ccc — test(schema): touch to trigger schema-sync workflow
+- **Updated (America/Chicago)**: 2025-09-28 17:17 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
