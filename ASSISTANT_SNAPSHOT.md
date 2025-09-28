@@ -6,7 +6,7 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: d833700 — A1-2: Auto-update Assistant Snapshot (commit + CT time + app tree)
+- **Latest commit**: fa7bc0f — A1-2-robust: tolerant label match + diff log for snapshot updater
 - **Updated (America/Chicago)**: 2025-09-27 19:03 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
@@ -92,11 +92,6 @@ db/
 docs/
   PROJECT_STATE.md
   WORKING_AGREEMENTS.md
-.env.example
-.gitignore
-ASSISTANT_SNAPSHOT.md
-README.md
-White_Sage.png
 assistant/
   data-model.md
   experiments.md
@@ -105,6 +100,11 @@ assistant/
   routes.md
   snapshot.json
   species-meta-notes.md
+.env.example
+.gitignore
+ASSISTANT_SNAPSHOT.md
+README.md
+White_Sage.png
 data/
   raw/
     species-meta-lookup.yaml
