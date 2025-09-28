@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: f439f28 — fix(snapshot): ignore snapshot-only commits; always show latest human commit
-- **Updated (America/Chicago)**: 2025-09-28 15:17 CT
+- **Latest commit**: 679ba39 — Update vercel-ignore.sh
+- **Updated (America/Chicago)**: 2025-09-28 15:25 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
