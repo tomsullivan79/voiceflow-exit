@@ -34,11 +34,12 @@ export async function runLLMAgent(bus: VariableBus): Promise<AgentResult> {
   // Tool loop
   for (let i = 0; i < 6; i++) {
     const resp = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-      messages,
-      tools: toolDefs as any,
-      tool_choice: "auto",
-      temperature: 0.2,
+        model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+        messages,
+        tools: toolDefs as any,
+        tool_choice: "auto",
+        temperature: 0.2,
+        timeout: 20000, // 20s
     });
 
     const msg = resp.choices[0].message;
