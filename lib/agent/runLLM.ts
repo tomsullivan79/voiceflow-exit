@@ -23,7 +23,6 @@ export async function runLLMAgent(bus: VariableBus): Promise<AgentResult> {
     { role: "system", content: SYSTEM_PROMPT },
     {
       role: "user",
-      // Chat Completions expects plain text or {type:"text"} parts. No "input_text".
       content:
         "Here is the Variable Bus JSON. Read it and decide what to do. Always call the tool 'finalize' to return blocks.\n\n" +
         JSON.stringify(bus),
@@ -34,14 +33,17 @@ export async function runLLMAgent(bus: VariableBus): Promise<AgentResult> {
 
   // Tool loop
   for (let i = 0; i < 6; i++) {
-    const resp = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-      messages,
-      tools: toolDefs as any,
-      tool_choice: "auto",
-      temperature: 0.2,
-      timeout: 20000, // 20s guard
-    });
+    const resp = await openai.chat.completions.create(
+      {
+        model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+        messages,
+        tools: toolDefs as any,
+        tool_choice: "auto",
+        temperature: 0.2,
+        // NOTE: do NOT put `timeout` here; it belongs in the second arg.
+      },
+      { timeout: 20000 } // ← correct place for timeout
+    );
 
     const msg = resp.choices[0].message;
 
