@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 4aae8a2 — 19B: router heuristics (urgency, after-hours rules, per-species overrides) and integrate into Option A; add /dev/router harness
-- **Updated (America/Chicago)**: 2025-09-29 16:50 CT
+- **Latest commit**: a736f63 — 19B polish: dispatch => public-health playbook + UI title; keep referral lines w/ Directions URL
+- **Updated (America/Chicago)**: 2025-09-29 17:21 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
