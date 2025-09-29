@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: ce13ba7 — directions url polish
-- **Updated (America/Chicago)**: 2025-09-29 16:38 CT
+- **Latest commit**: 4aae8a2 — 19B: router heuristics (urgency, after-hours rules, per-species overrides) and integrate into Option A; add /dev/router harness
+- **Updated (America/Chicago)**: 2025-09-29 16:50 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -49,6 +49,7 @@ app/
     PolicyBanner.tsx
   dev/
     agent/
+    router/
     tools/
     variable-bus/
   ingest/
@@ -80,6 +81,7 @@ components/
 lib/
   agent/
     promptContract.ts
+    router.ts
     runLLM.ts
     runOptionA.ts
   tools/
