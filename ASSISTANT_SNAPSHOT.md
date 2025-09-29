@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 05b1011 — 18C-Fix5: guard slug before indexing; alias narrow; tighten types
-- **Updated (America/Chicago)**: 2025-09-29 13:52 CT
+- **Latest commit**: 2f8b856 — 18D: add /dev/variable-bus inspector to visualize Variable Bus + species flags
+- **Updated (America/Chicago)**: 2025-09-29 13:57 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -46,6 +46,8 @@ app/
   chat/
     page.tsx
     PolicyBanner.tsx
+  dev/
+    variable-bus/
   ingest/
     page.tsx
   memories/
