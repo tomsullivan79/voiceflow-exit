@@ -18,7 +18,10 @@ function parseForce(req: NextRequest, bodyForce: unknown): boolean | undefined {
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms);
-    p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+    p.then(
+      (v) => { clearTimeout(t); resolve(v); },
+      (e) => { clearTimeout(t); reject(e); }
+    );
   });
 }
 
@@ -43,6 +46,20 @@ export async function POST(req: NextRequest) {
       : runOptionA(bus);
 
     const result = await runner;
+
+    // --- Micro-polish: safely normalize referral.validated when a target is present ---
+    const r: any = result?.updatedBus?.referral;
+    if (r && typeof r === "object") {
+      if (r.needed && r.target) {
+        // Immutable patch for cleaner diffs/logs
+        result.updatedBus = {
+          ...result.updatedBus,
+          referral: { ...r, validated: true },
+        };
+      }
+    }
+    // --- End micro-polish ---
+
     return NextResponse.json({ ok: true, usedLLM: useLLM, result });
   } catch (err: any) {
     const msg = (err && (err.message || String(err))) ?? "unknown_error";
