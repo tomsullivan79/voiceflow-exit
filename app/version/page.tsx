@@ -1,37 +1,33 @@
 // app/version/page.tsx
 import { headers } from "next/headers";
 
-export const dynamic = "force-dynamic";
-
-async function getVersion() {
-  const h = headers();
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  if (!host) throw new Error("Host header missing");
-  const base = `${proto}://${host}`;
-
-  const res = await fetch(`${base}/api/version`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Failed to load version: ${res.status}`);
-  return (await res.json()) as { commit: string; built_at: string };
-}
+export const dynamic = "force-dynamic"; // fine to keep/remove; helps in some envs
 
 export default async function VersionPage() {
-  const v = await getVersion();
+  // Next 15: headers() is async
+  const h = await headers();
+
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const baseUrl = `${proto}://${host}`;
+
   return (
     <main className="mx-auto max-w-xl p-6">
-      <h1 className="text-2xl font-semibold mb-4">Build Version</h1>
-      <div className="rounded-lg border p-4 text-sm">
+      <h1 className="text-xl font-semibold mb-4">Version</h1>
+      <dl className="space-y-2">
         <div>
-          <span className="font-medium">Commit:</span> {v.commit}
+          <dt className="font-medium">Protocol</dt>
+          <dd>{proto}</dd>
         </div>
         <div>
-          <span className="font-medium">Built at:</span> {v.built_at}
+          <dt className="font-medium">Host</dt>
+          <dd>{host}</dd>
         </div>
-      </div>
-      <p className="mt-4 text-xs text-gray-500">
-        Source of truth for commit is <code>ASSISTANT_SNAPSHOT.md</code> (Latest
-        human commit).
-      </p>
+        <div>
+          <dt className="font-medium">Base URL</dt>
+          <dd>{baseUrl}</dd>
+        </div>
+      </dl>
     </main>
   );
 }
