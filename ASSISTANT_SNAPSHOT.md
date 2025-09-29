@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 19a6fc2 — 18C-Fix2: Next15 cookie API — await cookies() for reads, use NextResponse.cookies for set/clear
-- **Updated (America/Chicago)**: 2025-09-29 13:12 CT
+- **Latest commit**: 7822fcc — 18C-Fix3: Next15 cookies() await + NextResponse.cookies in /api/auth/set
+- **Updated (America/Chicago)**: 2025-09-29 13:27 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
