@@ -18,14 +18,15 @@ const handlers: Record<string, (args: any) => Promise<ToolResult>> = {
 
 export async function runLLMAgent(bus: VariableBus): Promise<AgentResult> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
   const messages: any[] = [
     { role: "system", content: SYSTEM_PROMPT },
     {
       role: "user",
-      content: [
-        { type: "text", text: "Here is the Variable Bus. Read it and decide what to do. Remember to call finalize." },
-        { type: "input_text", text: JSON.stringify(bus) },
-      ],
+      // Chat Completions expects plain text or {type:"text"} parts. No "input_text".
+      content:
+        "Here is the Variable Bus JSON. Read it and decide what to do. Always call the tool 'finalize' to return blocks.\n\n" +
+        JSON.stringify(bus),
     },
   ];
 
@@ -34,17 +35,16 @@ export async function runLLMAgent(bus: VariableBus): Promise<AgentResult> {
   // Tool loop
   for (let i = 0; i < 6; i++) {
     const resp = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-        messages,
-        tools: toolDefs as any,
-        tool_choice: "auto",
-        temperature: 0.2,
-        timeout: 20000, // 20s
+      model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+      messages,
+      tools: toolDefs as any,
+      tool_choice: "auto",
+      temperature: 0.2,
+      timeout: 20000, // 20s guard
     });
 
     const msg = resp.choices[0].message;
 
-    // If the model produced a tool call, execute it/them
     if (msg.tool_calls && msg.tool_calls.length) {
       messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
 
@@ -55,7 +55,6 @@ export async function runLLMAgent(bus: VariableBus): Promise<AgentResult> {
         const handler = name ? handlers[name] : undefined;
         const result = handler ? await handler(args) : { error: `No handler for ${name}` };
 
-        // Capture finalize output if present
         if ((result as any).__finalize__) {
           final = (result as any).__finalize__ as FinalizeArgs;
         }
@@ -72,16 +71,14 @@ export async function runLLMAgent(bus: VariableBus): Promise<AgentResult> {
       continue;
     }
 
-    // No tool calls — try one more turn or bail
-    if (msg.content) {
-      // Nudge: ask it to finalize if it forgot
+    // If no tool calls, nudge once to finalize
+    if (msg.content && i < 5) {
       messages.push({ role: "user", content: "Please call finalize with your blocks and any bus_patch." });
       continue;
     }
     break;
   }
 
-  // Fallback if the model forgot to finalize
   if (!final) {
     return {
       mode: bus.mode,
