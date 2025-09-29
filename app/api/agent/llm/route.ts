@@ -39,28 +39,45 @@ export async function POST(req: NextRequest) {
     const force = parseForce(req, body?.force);
 
     const openAIConfigured = !!process.env.OPENAI_API_KEY;
-    const useLLM = openAIConfigured && force !== false;
+    const tryLLM = openAIConfigured && force !== false;
 
-    const runner = useLLM
-      ? withTimeout(runLLMAgent(bus), 20000) // 20s guard
-      : runOptionA(bus);
+    let result: Awaited<ReturnType<typeof runOptionA>>;
+    let usedLLM = false;
+    let fallback: "llm_timeout" | undefined;
 
-    const result = await runner;
-
-    // --- Micro-polish: safely normalize referral.validated when a target is present ---
-    const r: any = result?.updatedBus?.referral;
-    if (r && typeof r === "object") {
-      if (r.needed && r.target) {
-        // Immutable patch for cleaner diffs/logs
-        result.updatedBus = {
-          ...result.updatedBus,
-          referral: { ...r, validated: true },
-        };
+    if (tryLLM) {
+      try {
+        // 20s guard around the LLM path
+        result = await withTimeout(runLLMAgent(bus), 20000);
+        usedLLM = true;
+      } catch (err: any) {
+        const msg = (err && (err.message || String(err))) ?? "";
+        // Graceful fallback on timeout
+        if (/timeout/i.test(msg)) {
+          fallback = "llm_timeout";
+          result = await runOptionA(bus);
+          usedLLM = false;
+        } else {
+          // Non-timeout errors still surface as 500
+          console.error("LLM error:", msg);
+          return NextResponse.json({ ok: false, error: msg || "llm_error" }, { status: 500 });
+        }
       }
+    } else {
+      result = await runOptionA(bus);
+      usedLLM = false;
     }
-    // --- End micro-polish ---
 
-    return NextResponse.json({ ok: true, usedLLM: useLLM, result });
+    // Normalize referral.validated immutably if a target is present & needed
+    const r: any = result?.updatedBus?.referral;
+    if (r && typeof r === "object" && r.needed && r.target) {
+      result.updatedBus = {
+        ...result.updatedBus,
+        referral: { ...r, validated: true },
+      };
+    }
+
+    return NextResponse.json({ ok: true, usedLLM, ...(fallback ? { fallback } : {}), result });
   } catch (err: any) {
     const msg = (err && (err.message || String(err))) ?? "unknown_error";
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
