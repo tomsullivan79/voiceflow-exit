@@ -29,7 +29,7 @@ type LookupEntry = {
 };
 
 type MetaEntry = {
-  slug?: string;               // canonical if present
+  slug?: string; // canonical if present
   common_name?: string;
   scientific_name?: string;
   category?: string;
@@ -41,15 +41,23 @@ type MetaEntry = {
     behavior?: string[];
     environment?: string[];
   };
-  alias_for?: string;          // means: THIS entry is an alias for canonical slug
-  aliases?: string[];          // or the alternates to fold into this canonical
+  alias_for?: string; // means: THIS entry is an alias for canonical slug
+  aliases?: string[]; // or the alternates to fold into this canonical
 };
 
 type SpeciesMetaPayload = {
   slug: string;
   common_name: string;
   scientific_name?: string;
-  category?: "mammal"|"bird"|"reptile"|"amphibian"|"other"|"rodent"|"songbird"|string;
+  category?:
+    | "mammal"
+    | "bird"
+    | "reptile"
+    | "amphibian"
+    | "other"
+    | "rodent"
+    | "songbird"
+    | string;
   intervention_needed?: string;
   referral_required_level?: string;
   dangerous_level?: string;
@@ -75,12 +83,16 @@ type SpeciesSeed = { species: SpeciesMetaPayload[] };
 // ---------- Helpers ----------
 const DATA_DIR = path.join(process.cwd(), "data");
 const LOOKUP_PATH = path.join(DATA_DIR, "species-meta-lookup.json");
-const META_PATH   = path.join(DATA_DIR, "species-meta.json");
-const OUT_PATH    = path.join(DATA_DIR, "species-merged.json");
+const META_PATH = path.join(DATA_DIR, "species-meta.json");
+const OUT_PATH = path.join(DATA_DIR, "species-merged.json");
 
 function toSlug(s?: string) {
   if (!s) return undefined;
-  return s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 function arrayify<T>(x: any): T[] {
@@ -97,15 +109,17 @@ function loadJSON<T>(p: string): T {
 function normalizeLookup(input: any): Record<string, LookupEntry> {
   const out: Record<string, LookupEntry> = {};
   if (Array.isArray(input)) {
-    for (const e of input) {
+    for (const e of input as LookupEntry[]) {
       const slug = toSlug(e.slug || e.common_name);
-      if (!slug) continue;
+      if (!slug) continue; // guard: don't index with undefined
       out[slug] = { ...e, slug };
     }
   } else if (input && typeof input === "object") {
     for (const k of Object.keys(input)) {
-      const slug = toSlug(input[k].slug || input[k].common_name || k);
-      out[slug] = { ...input[k], slug, common_name: input[k].common_name ?? k };
+      const rec = input[k] as LookupEntry;
+      const slug = toSlug(rec?.slug || rec?.common_name || k);
+      if (!slug) continue; // guard: don't index with undefined
+      out[slug] = { ...rec, slug, common_name: rec?.common_name ?? k };
     }
   }
   return out;
@@ -114,15 +128,17 @@ function normalizeLookup(input: any): Record<string, LookupEntry> {
 function normalizeMeta(input: any): Record<string, MetaEntry> {
   const out: Record<string, MetaEntry> = {};
   if (Array.isArray(input)) {
-    for (const e of input) {
+    for (const e of input as MetaEntry[]) {
       const slug = toSlug(e.slug || e.common_name);
-      if (!slug) continue;
+      if (!slug) continue; // guard
       out[slug] = { ...e, slug };
     }
   } else if (input && typeof input === "object") {
     for (const k of Object.keys(input)) {
-      const slug = toSlug(input[k].slug || input[k].common_name || k);
-      out[slug] = { ...input[k], slug, common_name: input[k].common_name ?? k };
+      const rec = input[k] as MetaEntry;
+      const slug = toSlug(rec?.slug || rec?.common_name || k);
+      if (!slug) continue; // guard
+      out[slug] = { ...rec, slug, common_name: rec?.common_name ?? k };
     }
   }
   return out;
@@ -131,7 +147,10 @@ function normalizeMeta(input: any): Record<string, MetaEntry> {
 // Merge strategy:
 // 1) union of keys from lookup and meta
 // 2) if meta.alias_for exists, treat this meta slug as an alias → attach to canonical (alias_for)
-function merge(lookupMap: Record<string, LookupEntry>, metaMap: Record<string, MetaEntry>): SpeciesSeed {
+function merge(
+  lookupMap: Record<string, LookupEntry>,
+  metaMap: Record<string, MetaEntry>
+): SpeciesSeed {
   // Build canonical map and collect alias edges
   const canonical: Record<string, SpeciesMetaPayload> = {};
   const aliasPairs: Array<{ alias: string; canonical: string }> = [];
@@ -177,13 +196,16 @@ function merge(lookupMap: Record<string, LookupEntry>, metaMap: Record<string, M
     if (!c) continue;
     // keep levels if present, otherwise leave undefined (API will handle fallbacks)
     c.intervention_needed = l.intervention_needed ?? c.intervention_needed;
-    c.referral_required_level = l.referral_required_level ?? c.referral_required_level;
+    c.referral_required_level =
+      l.referral_required_level ?? c.referral_required_level;
     c.dangerous_level = l.dangerous_level ?? c.dangerous_level;
     c.rabies_vector_level = l.rabies_vector_level ?? c.rabies_vector_level;
-    c.needs_species_escalation_level = l.needs_species_escalation_level ?? c.needs_species_escalation_level;
+    c.needs_species_escalation_level =
+      l.needs_species_escalation_level ?? c.needs_species_escalation_level;
     c.bat_exposure_level = l.bat_exposure_level ?? c.bat_exposure_level;
     c.potential_aggression = l.potential_aggression ?? c.potential_aggression;
-    c.age_assessment_needed = l.age_assessment_needed ?? c.age_assessment_needed;
+    c.age_assessment_needed =
+      l.age_assessment_needed ?? c.age_assessment_needed;
 
     // also carry boolean fallbacks if lookup provides them
     c.referral_required = l.referral_required ?? c.referral_required;
@@ -206,14 +228,21 @@ function merge(lookupMap: Record<string, LookupEntry>, metaMap: Record<string, M
     }
   }
 
-  // Dedupe and sort aliases
+  // Dedupe and normalize aliases to slugs
   for (const slug of Object.keys(canonical)) {
     const c = canonical[slug];
-    if (c.aliases?.length) c.aliases = Array.from(new Set(c.aliases.map(toSlug).filter(Boolean))) as string[];
+    if (c.aliases?.length) {
+      const norm = c.aliases
+        .map((a) => toSlug(a))
+        .filter((s): s is string => !!s);
+      c.aliases = Array.from(new Set(norm));
+    }
   }
 
   // Emit as array, sorted for sanity
-  const species = Object.values(canonical).sort((a, b) => a.slug.localeCompare(b.slug));
+  const species = Object.values(canonical).sort((a, b) =>
+    a.slug.localeCompare(b.slug)
+  );
   return { species };
 }
 
@@ -223,7 +252,7 @@ function main() {
   if (!fs.existsSync(LOOKUP_PATH) || !fs.existsSync(META_PATH)) {
     console.error(
       `Missing input.\nPlace your files here as JSON:\n  ${LOOKUP_PATH}\n  ${META_PATH}\n` +
-      `See README in this file header for format hints.`
+        `See README in this file header for format hints.`
     );
     process.exit(1);
   }
