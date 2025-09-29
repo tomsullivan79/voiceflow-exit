@@ -3,6 +3,7 @@ import { VariableBus, Mode } from "@/types/variableBus";
 import { referralSearch } from "@/lib/tools/referralSearch";
 import { statusLookup } from "@/lib/tools/statusLookup";
 import { instructionsFetch } from "@/lib/tools/instructionsFetch";
+import { routeDecision } from "@/lib/agent/router";
 
 export type AgentBlockType = "summary" | "steps" | "referral" | "status" | "warning";
 export type AgentBlock = {
@@ -19,17 +20,6 @@ export type AgentResult = {
   debug?: Record<string, unknown>;
 };
 
-function pickDecision(bus: VariableBus): NonNullable<VariableBus["triage"]["decision"]> {
-  // Honor an explicit decision if set
-  const explicit = bus.triage?.decision;
-  if (explicit && explicit !== "unknown") return explicit;
-
-  // Heuristics (simple for now)
-  if (bus.species_flags.referral_required) return "referral";
-  if (bus.triage?.urgency === "critical") return "dispatch";
-  return "bring_in";
-}
-
 export async function runOptionA(bus: VariableBus): Promise<AgentResult> {
   const blocks: AgentBlock[] = [];
   const patch: Partial<VariableBus> = {};
@@ -37,18 +27,30 @@ export async function runOptionA(bus: VariableBus): Promise<AgentResult> {
   switch (bus.mode) {
     case "triage": {
       const species = bus.animal.species_slug ?? bus.animal.species_text ?? "unknown species";
-      const decision = pickDecision(bus);
-      const instr = await instructionsFetch({ species_slug: bus.animal.species_slug, decision });
 
+      // NEW: router decides decision/urgency with heuristics
+      const routed = routeDecision(bus);
+      patch.triage = {
+        ...(bus.triage ?? {}),
+        decision: routed.decision,
+        urgency: routed.urgency,
+        caution_required: bus.species_flags.dangerous || !!bus.exposure?.human_bite_possible || !!bus.exposure?.bat_sleeping_area,
+      };
+
+      // After-hours note → warning block (if present)
+      if (routed.afterHoursNote) {
+        blocks.push({ type: "warning", title: "After-hours policy", text: routed.afterHoursNote });
+      }
+
+      // Fetch instructions by final decision
+      const instr = await instructionsFetch({ species_slug: bus.animal.species_slug, decision: routed.decision });
       blocks.push(
-        { type: "summary", title: "Triage Summary", text: `Decision: ${decision} for ${species}.` },
+        { type: "summary", title: "Triage Summary", text: `Decision: ${routed.decision} for ${species}. Urgency: ${routed.urgency}.` },
         { type: "steps", title: "Do this next", lines: instr.steps }
       );
 
-      patch.triage = { ...(bus.triage ?? {}), decision };
-
-      // If decision implies referral, or species requires referral, surface partner
-      if (decision === "referral" || bus.species_flags.referral_required) {
+      // Referral if required/selected
+      if (routed.decision === "referral" || bus.species_flags.referral_required) {
         const ref = await referralSearch({ species_slug: bus.animal.species_slug ?? "" });
         patch.referral = {
           needed: ref.needed,
@@ -70,7 +72,16 @@ export async function runOptionA(bus: VariableBus): Promise<AgentResult> {
           });
         }
       }
-      return { mode: bus.mode, blocks, updatedBus: patch, debug: { instrSource: instr.source } };
+
+      return {
+        mode: bus.mode,
+        blocks,
+        updatedBus: patch,
+        debug: {
+          router: routed,
+          instrSource: instr.source,
+        },
+      };
     }
 
     case "patient_status": {
