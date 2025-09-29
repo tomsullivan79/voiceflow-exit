@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 1ee1526 — LLM route: graceful fallback on timeout; immutable referral.validated normalization
-- **Updated (America/Chicago)**: 2025-09-29 16:25 CT
+- **Latest commit**: ce13ba7 — directions url polish
+- **Updated (America/Chicago)**: 2025-09-29 16:38 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
