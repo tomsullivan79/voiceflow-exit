@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: b293369 — 18E: add tool stubs (statusLookup, referralSearch, instructionsFetch) + /dev/tools harness
-- **Updated (America/Chicago)**: 2025-09-29 14:30 CT
+- **Latest commit**: 36991c6 — 18F: single-agent runner (Option A) + /dev/agent harness
+- **Updated (America/Chicago)**: 2025-09-29 14:51 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -47,6 +47,7 @@ app/
     page.tsx
     PolicyBanner.tsx
   dev/
+    agent/
     tools/
     variable-bus/
   ingest/
@@ -76,6 +77,8 @@ components/
   BrandHeader.tsx
   VersionChip.tsx
 lib/
+  agent/
+    runOptionA.ts
   tools/
     instructionsFetch.ts
     referralSearch.ts
