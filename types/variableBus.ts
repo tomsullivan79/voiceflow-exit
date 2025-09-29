@@ -151,27 +151,42 @@ export function createEmptyBus(mode: Mode, tz = 'America/Chicago'): VariableBus 
   };
 }
 
-// Helper: map species_meta row into flags
+/** Internal: robustly coerce DB-ish values into booleans. */
+function toBool(v: unknown): boolean {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v !== 0;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    return s === 'true' || s === '1' || s === 'yes' || s === 'y';
+  }
+  return false;
+}
+
+/**
+ * Helper: map species_meta row into flags (tolerates string/number booleans).
+ * Accepts either raw species_meta row or the species_meta_lookup view row.
+ */
 export function mapSpeciesMetaToFlags(row: {
-  dangerous?: boolean;
-  rabies_vector?: boolean;
-  referral_required?: boolean;
-  intervention_needed?: 'never' | 'sometimes' | 'always' | boolean;
-  after_hours_allowed?: boolean;
+  dangerous?: boolean | string | number;
+  rabies_vector?: boolean | string | number;
+  referral_required?: boolean | string | number;
+  intervention_needed?: 'never' | 'sometimes' | 'always' | boolean | string;
+  after_hours_allowed?: boolean | string | number;
 }): VariableBus['species_flags'] {
-  const intervention =
-    typeof row.intervention_needed === 'boolean'
-      ? row.intervention_needed
-      : row.intervention_needed === 'always'
-        ? true
-        : row.intervention_needed === 'never'
-          ? false
-          : false; // 'sometimes' -> default false, triage can still escalate
+  // Normalize intervention_needed to a boolean bias
+  let intervention = false;
+  if (typeof row.intervention_needed === 'boolean') {
+    intervention = row.intervention_needed;
+  } else if (typeof row.intervention_needed === 'string') {
+    const s = row.intervention_needed.trim().toLowerCase();
+    intervention = s === 'always' ? true : s === 'never' ? false : false; // 'sometimes' => false (triage can still escalate)
+  }
+
   return {
-    dangerous: !!row.dangerous,
-    rabies_vector: !!row.rabies_vector,
-    referral_required: !!row.referral_required,
+    dangerous: toBool(row.dangerous),
+    rabies_vector: toBool(row.rabies_vector),
+    referral_required: toBool(row.referral_required),
     intervention_needed: intervention,
-    after_hours_allowed: !!row.after_hours_allowed,
+    after_hours_allowed: toBool(row.after_hours_allowed),
   };
 }
