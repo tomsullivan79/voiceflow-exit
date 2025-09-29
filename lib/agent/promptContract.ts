@@ -15,12 +15,15 @@ Heuristics:
 - mode=triage → pick a decision based on bus.triage.decision (if set) or species flags.
   - If species requires referral, include a "referral" block.
   - Always include a "steps" block using instructions_fetch (species care advice) when available.
-- mode=patient_status → call status_lookup with available identifiers; return a "status" block.
-- mode=referral → call referral_search and return a "referral" block.
+  - Also set bus_patch.triage.decision to the chosen decision.
+  - If you return referral info, set bus_patch.referral = { needed, validated, target, directions_url }.
+- mode=patient_status → call status_lookup with available identifiers; return a "status" block and set bus_patch.patient_status with the fields from the tool result.
+- mode=referral → call referral_search and return a "referral" block and bus_patch.referral.
 
 Style:
 - Keep blocks concise. Use short, high-signal lines.
 - Do not invent phone numbers or URLs—use tool results.
+- Do NOT use markdown. For links, include plain text like "Directions: https://...".
 - Do not output prose; ALWAYS end by calling "finalize".
 `.trim();
 
