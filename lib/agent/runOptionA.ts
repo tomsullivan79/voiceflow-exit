@@ -28,13 +28,16 @@ export async function runOptionA(bus: VariableBus): Promise<AgentResult> {
     case "triage": {
       const species = bus.animal.species_slug ?? bus.animal.species_text ?? "unknown species";
 
-      // NEW: router decides decision/urgency with heuristics
+      // Router decides decision/urgency with heuristics (incl. after-hours & public-health)
       const routed = routeDecision(bus);
       patch.triage = {
         ...(bus.triage ?? {}),
         decision: routed.decision,
         urgency: routed.urgency,
-        caution_required: bus.species_flags.dangerous || !!bus.exposure?.human_bite_possible || !!bus.exposure?.bat_sleeping_area,
+        caution_required:
+          !!bus.species_flags.dangerous ||
+          !!bus.exposure?.human_bite_possible ||
+          !!bus.exposure?.bat_sleeping_area,
       };
 
       // After-hours note → warning block (if present)
@@ -42,11 +45,22 @@ export async function runOptionA(bus: VariableBus): Promise<AgentResult> {
         blocks.push({ type: "warning", title: "After-hours policy", text: routed.afterHoursNote });
       }
 
-      // Fetch instructions by final decision
-      const instr = await instructionsFetch({ species_slug: bus.animal.species_slug, decision: routed.decision });
+      // Fetch instructions by final decision (dispatch => public-health playbook)
+      const instr = await instructionsFetch({
+        species_slug: bus.animal.species_slug,
+        decision: routed.decision,
+      });
+
+      const stepsTitle =
+        routed.decision === "dispatch" ? "Public Health — Do this now" : "Do this next";
+
       blocks.push(
-        { type: "summary", title: "Triage Summary", text: `Decision: ${routed.decision} for ${species}. Urgency: ${routed.urgency}.` },
-        { type: "steps", title: "Do this next", lines: instr.steps }
+        {
+          type: "summary",
+          title: "Triage Summary",
+          text: `Decision: ${routed.decision} for ${species}. Urgency: ${routed.urgency}.`,
+        },
+        { type: "steps", title: stepsTitle, lines: instr.steps }
       );
 
       // Referral if required/selected
@@ -116,7 +130,12 @@ export async function runOptionA(bus: VariableBus): Promise<AgentResult> {
         ].filter(Boolean) as string[],
       });
 
-      return { mode: bus.mode, blocks, updatedBus: patch, debug: { matched: res.matched, matchedBy: res.matchedBy } };
+      return {
+        mode: bus.mode,
+        blocks,
+        updatedBus: patch,
+        debug: { matched: res.matched, matchedBy: res.matchedBy },
+      };
     }
 
     case "referral": {
@@ -129,7 +148,10 @@ export async function runOptionA(bus: VariableBus): Promise<AgentResult> {
       };
 
       if (!ref.needed) {
-        blocks.push({ type: "summary", text: "No referral needed. Your organization can handle this species." });
+        blocks.push({
+          type: "summary",
+          text: "No referral needed. Your organization can handle this species.",
+        });
       } else if (ref.target) {
         blocks.push({
           type: "referral",

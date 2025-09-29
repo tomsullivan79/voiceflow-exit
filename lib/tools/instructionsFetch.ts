@@ -1,102 +1,81 @@
 // lib/tools/instructionsFetch.ts
 import { createClient } from "@supabase/supabase-js";
 
-export type InstructionDecision = "monitor" | "self_help" | "bring_in" | "referral" | "dispatch" | "unknown";
+type Decision = "monitor" | "self_help" | "bring_in" | "referral" | "dispatch" | "unknown";
 
-export type InstructionsInput = {
-  species_slug?: string;
-  decision: InstructionDecision;
+type Args = {
+  species_slug?: string | null;
+  decision: Decision;
 };
 
-export type InstructionsResult = {
-  decision: InstructionDecision;
-  steps: string[];          // concise, numbered-friendly lines
-  reference?: {             // long-form guidance, if any
-    title: string;
-    text: string;
-  };
-  source: "species_meta.care_advice" | "generic";
-};
+type Out = { steps: string[]; source: string };
 
-function genericSteps(decision: InstructionDecision): string[] {
-  switch (decision) {
-    case "monitor":
-      return [
-        "Observe from a distance for 2–4 hours.",
-        "Keep people and pets away.",
-        "If condition worsens, start containment and call back."
-      ];
-    case "self_help":
-      return [
-        "Prepare a ventilated cardboard box with a soft towel.",
-        "Place the animal inside, keep in a dark, quiet room.",
-        "Do not feed or give water unless specifically instructed."
-      ];
-    case "bring_in":
-      return [
-        "Line a ventilated box/kennel with a towel; no wire cages.",
-        "Gently place the animal inside; keep dark, quiet, and warm.",
-        "Transport directly to the center; avoid loud music and stops."
-      ];
-    case "referral":
-      return [
-        "Do not handle unless absolutely necessary and safe.",
-        "Use a towel/blanket to cover and gently contain if required.",
-        "Contact the referral partner for intake instructions."
-      ];
-    case "dispatch":
-      return [
-        "For immediate safety, call local non-emergency dispatch or Animal Control.",
-        "Provide exact location and species description.",
-        "Maintain safe distance until responders arrive."
-      ];
-    default:
-      return ["No specific steps available."];
+export async function instructionsFetch({ species_slug, decision }: Args): Promise<Out> {
+  // Public Health Escalation (formerly "dispatch") — decision-specific steps
+  if (decision === "dispatch") {
+    return {
+      steps: [
+        "Do not touch the animal. Keep people and pets away.",
+        "If a bat was in a room with a sleeping person or with a child/elder/impaired individual, treat as potential rabies exposure.",
+        "Close interior doors and confine the area if safe to do so.",
+        "If the animal is already contained (e.g., in a box), keep it closed and in a low-traffic room.",
+        "Contact your local Public Health Department or Animal Control for exposure guidance and testing instructions.",
+        "If anyone had direct contact, bite, or scratch: wash the area with soap and water for 15 minutes and seek medical care immediately.",
+        "If advised to submit the animal for testing, follow their instructions for safe transport; do not attempt handling without guidance.",
+      ],
+      source: "playbook.public_health",
+    };
   }
-}
 
-/**
- * Pulls care_advice when available and splits into concise steps.
- * Fallback to generic steps based on the decision.
- */
-export async function instructionsFetch(
-  input: InstructionsInput
-): Promise<InstructionsResult> {
+  // For other decisions, try species_meta care advice
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE;
 
-  if (!input.species_slug || !url || !service) {
-    return { decision: input.decision, steps: genericSteps(input.decision), source: "generic" };
-  }
-
-  try {
+  if (species_slug && url && service) {
     const supabase = createClient(url, service, { auth: { persistSession: false } });
-    const { data } = await supabase
-      .from("species_meta")
-      .select("common_name, care_advice")
-      .eq("slug", input.species_slug)
+    const { data, error } = await supabase
+      .from("species_meta_lookup")
+      .select("care_advice")
+      .eq("slug", species_slug)
       .maybeSingle();
 
-    if (data?.care_advice) {
-      // Split on bullet markers or line breaks into concise steps
-      const raw = String(data.care_advice);
-      const parts = raw
-        .split(/\n|\r|▸/g)
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-
-      // Keep up to ~8 concise lines
-      const steps = parts.slice(0, 8);
-      return {
-        decision: input.decision,
-        steps: steps.length ? steps : genericSteps(input.decision),
-        reference: { title: data.common_name ?? input.species_slug, text: raw },
-        source: "species_meta.care_advice",
-      };
+    if (!error && data?.care_advice) {
+      const lines = data.care_advice
+        .split(/\n+/)
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+      return { steps: lines, source: "species_meta.care_advice" };
     }
-  } catch {
-    // ignore and fall through
   }
 
-  return { decision: input.decision, steps: genericSteps(input.decision), source: "generic" };
+  // Safe fallback if nothing else
+  const fallback: Record<Decision, string[]> = {
+    monitor: [
+      "Observe from a distance. Do not feed or give water.",
+      "Keep pets and people away; re-check in a few hours.",
+    ],
+    self_help: [
+      "Place the animal in a ventilated cardboard box with a towel.",
+      "Keep dark, warm, and quiet. Do not feed or give water.",
+    ],
+    bring_in: [
+      "Carefully place the animal in a ventilated box/kennel with a towel.",
+      "Keep dark, warm, and quiet. Transport to the center during open hours.",
+    ],
+    referral: [
+      "Follow the referral instructions provided for this species/region.",
+      "Call the partner organization before transporting if advised.",
+    ],
+    dispatch: [
+      // This path should have been handled above; keep a minimal safety copy.
+      "Keep people and pets away; do not handle.",
+      "Contact local Public Health/Animal Control for exposure guidance.",
+    ],
+    unknown: [
+      "Keep people and pets away and do not feed or give water.",
+      "We’ll determine the next steps once more info is available.",
+    ],
+  };
+
+  return { steps: fallback[decision] ?? fallback.unknown, source: "fallback.default" };
 }
