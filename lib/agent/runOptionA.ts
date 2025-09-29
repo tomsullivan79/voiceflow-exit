@@ -65,6 +65,7 @@ export async function runOptionA(bus: VariableBus): Promise<AgentResult> {
               ref.target.phone ? `Phone: ${ref.target.phone}` : undefined,
               ref.target.url ? `Website: ${ref.target.url}` : undefined,
               ref.target.coverage ? `Notes: ${ref.target.coverage}` : undefined,
+              ref.target.directions_url ? `Directions: ${ref.target.directions_url}` : undefined,
             ].filter(Boolean) as string[],
           });
         }
@@ -127,6 +128,7 @@ export async function runOptionA(bus: VariableBus): Promise<AgentResult> {
             ref.target.phone ? `Phone: ${ref.target.phone}` : undefined,
             ref.target.url ? `Website: ${ref.target.url}` : undefined,
             ref.target.coverage ? `Notes: ${ref.target.coverage}` : undefined,
+            ref.target.directions_url ? `Directions: ${ref.target.directions_url}` : undefined,
           ].filter(Boolean) as string[],
         });
       }
