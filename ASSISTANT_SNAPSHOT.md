@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: d435c34 — 19A fix: chat.completions content uses plain text (no input_text); add 20s timeout
-- **Updated (America/Chicago)**: 2025-09-29 15:39 CT
+- **Latest commit**: b080942 — 19A fix2: move OpenAI timeout to RequestOptions
+- **Updated (America/Chicago)**: 2025-09-29 15:47 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
