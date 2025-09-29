@@ -47,7 +47,7 @@ function getAdminClient(url: string, service: string) {
 }
 
 async function requireSession(url: string, anon: string) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies(); // Next 15: cookies() is async
   const supabase = createServerClient(url, anon, {
     cookies: {
       get(name: string) { return cookieStore.get(name)?.value; },
@@ -264,8 +264,8 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
                         <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: "#111827" }}>
                           Code {e.error_code}
                         </div>
-                        {errTip ? <div style={{ fontSize: 12, color: cardSubtle }}>{errTip}</div> : null}
-                        {e.error_message ? <div style={{ fontSize: 12, color: cardSubtle }}>{e.error_message}</div> : null}
+                        {errTip ? <div style={{ fontSize: 12, color: "#4b5563" }}>{errTip}</div> : null}
+                        {e.error_message ? <div style={{ fontSize: 12, color: "#4b5563" }}>{e.error_message}</div> : null}
                       </div>
                     ) : "—"}
                   </td>
@@ -274,14 +274,14 @@ export default async function SmsLogPage({ searchParams }: { searchParams: Searc
             })}
             {events.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: 16, textAlign: "center", color: cardSubtle }}>No events found.</td>
+                <td colSpan={6} style={{ padding: 16, textAlign: "center", color: "#4b5563" }}>No events found.</td>
               </tr>
             ) : null}
           </tbody>
         </table>
       </div>
 
-      <p style={{ color: pageSub, fontSize: 12, marginTop: 8 }}>Showing up to {limit} most recent events.</p>
+      <p style={{ color: "#cbd5e1", fontSize: 12, marginTop: 8 }}>Showing up to {limit} most recent events.</p>
     </main>
   );
 }

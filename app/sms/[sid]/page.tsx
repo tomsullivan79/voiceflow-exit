@@ -35,7 +35,7 @@ function getEnv() {
 }
 
 async function requireSession(url: string, anon: string) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies(); // Next 15: cookies() is async
   const supabase = createServerClient(url, anon, {
     cookies: {
       get(name: string) {
