@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 type WTResponse = {
   ok?: boolean;
@@ -13,8 +13,8 @@ type WTResponse = {
   error?: string;
 };
 
-const DEFAULT_BUS = JSON.stringify(
-  {
+const PRESETS: Record<string, any> = {
+  osprey_referral: {
     mode: 'triage',
     caller: { roles: [], zip: '55414', county: 'Hennepin County' },
     preferences: {},
@@ -32,9 +32,46 @@ const DEFAULT_BUS = JSON.stringify(
     org: { site_code: 'WRCMN', timezone: 'America/Chicago', after_hours: false },
     system: { channel: 'web', system_time: '2025-01-01T00:00:00Z' }
   },
-  null,
-  2
-);
+  bat_dispatch: {
+    mode: 'triage',
+    caller: { roles: [], zip: '55414', county: 'Hennepin County' },
+    preferences: {},
+    consent: {},
+    animal: { species_slug: 'big-brown-bat', species_text: 'Big Brown Bat', contained: false },
+    exposure: { bat_sleeping_area: true },
+    species_flags: {
+      dangerous: false,
+      rabies_vector: true,
+      referral_required: false,
+      intervention_needed: false,
+      after_hours_allowed: false
+    },
+    triage: {},
+    conversation: {},
+    org: { site_code: 'WRCMN', timezone: 'America/Chicago', after_hours: false },
+    system: { channel: 'web', system_time: '2025-01-01T00:00:00Z' }
+  },
+  raccoon_afterhours_deflect: {
+    mode: 'triage',
+    caller: { roles: [], zip: '55414', county: 'Hennepin County' },
+    preferences: {},
+    consent: {},
+    animal: { species_slug: 'raccoon', species_text: 'Raccoon', observed_condition: 'injured', contained: false },
+    species_flags: {
+      dangerous: false,
+      rabies_vector: true,
+      referral_required: false,
+      intervention_needed: false,
+      after_hours_allowed: false
+    },
+    triage: {},
+    conversation: {},
+    org: { site_code: 'WRCMN', timezone: 'America/Chicago', after_hours: true, after_hours_rule: 'deflect' },
+    system: { channel: 'web', system_time: '2025-01-01T00:00:00Z' }
+  }
+};
+
+const DEFAULT_BUS = JSON.stringify(PRESETS.osprey_referral, null, 2);
 
 // --- tiny diff helper (limited to triage/referral) ---
 function flatten(obj: any, prefix = ''): Record<string, any> {
@@ -69,6 +106,17 @@ export default function DevChatPage() {
   const [data, setData] = useState<WTResponse | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [lastSentBus, setLastSentBus] = useState<any | null>(null);
+  const [presetSel, setPresetSel] = useState<string>('osprey_referral');
+
+  // Optional: ?preset=bat_dispatch
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const p = sp.get('preset');
+    if (p && PRESETS[p]) {
+      setPresetSel(p);
+      setJsonText(JSON.stringify(PRESETS[p], null, 2));
+    }
+  }, []);
 
   const endpoint = useMemo(() => (useLLM ? '/api/agent/llm' : '/api/agent/llm?force=false'), [useLLM]);
 
@@ -131,12 +179,32 @@ export default function DevChatPage() {
     };
   }, [lastSentBus, data]);
 
+  function handleLoadPreset() {
+    const obj = PRESETS[presetSel] ?? PRESETS.osprey_referral;
+    setJsonText(JSON.stringify(obj, null, 2));
+  }
+
   return (
     <div className="wrap">
       <div className="card">
         <h1>Dev · Minimal Chat UI</h1>
-        <p className="muted">Paste/edit a <code>bus</code> JSON and submit. Toggle deterministic vs LLM.</p>
+        <p className="muted">Choose a preset or paste your own <code>bus</code>. Toggle deterministic vs LLM.</p>
 
+        {/* Presets */}
+        <div className="presets">
+          <label className="label">Presets</label>
+          <div className="row">
+            <select value={presetSel} onChange={(e) => setPresetSel(e.target.value)} className="select" aria-label="Presets">
+              <option value="osprey_referral">Osprey — referral</option>
+              <option value="bat_dispatch">Bat — dispatch (sleeping area, uncontained)</option>
+              <option value="raccoon_afterhours_deflect">Raccoon — after-hours deflect</option>
+            </select>
+            <button type="button" onClick={handleLoadPreset} className="button secondary">Load preset</button>
+          </div>
+          <p className="muted small">Loading replaces the textarea JSON. Tip: add <code>?preset=bat_dispatch</code> to the URL.</p>
+        </div>
+
+        {/* Editor */}
         <form onSubmit={handleSubmit} className="form">
           <label className="label">
             Bus JSON
@@ -188,7 +256,7 @@ export default function DevChatPage() {
 
                     {typeof b?.text === 'string' && <p className="text">{b.text}</p>}
 
-                    {/* NEW: render steps.lines and items */}
+                    {/* Render steps.lines and items */}
                     {Array.isArray(b?.lines) && b.lines.length > 0 && (
                       <ul className="list">
                         {b.lines.map((it: any, j: number) => (
@@ -255,13 +323,25 @@ export default function DevChatPage() {
         :global(html[data-theme='dark']) .card { background: #121416; color: #e8eaed; }
         h1 { margin: 0 0 4px; font-size: 22px; line-height: 1.2; }
         .muted { color: #6b7280; margin: 0 0 16px; }
+        .small { font-size: 12px; margin-top: 6px; }
+        .presets { margin: 6px 0 12px; }
+        .select {
+          min-width: 260px;
+          padding: 8px 10px;
+          border-radius: 10px;
+          border: 1px solid #e5e7eb;
+          background: #fff; color: #111;
+        }
+        :global(html[data-theme='dark']) .select { background: #0f1115; color: #e8eaed; border-color: #1f2937; }
         .form { display: grid; gap: 12px; margin-bottom: 16px; }
         .label { display: grid; gap: 8px; font-weight: 600; }
-        .textarea { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 13px; padding: 10px 12px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111; }
+        .textarea { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 13px; padding: 10px 12px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111; }
         :global(html[data-theme='dark']) .textarea { background: #0f1115; color: #e8eaed; border-color: #1f2937; }
-        .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .row { display: flex; align-items: center; gap: 12px; }
         .checkbox { display: flex; align-items: center; gap: 8px; font-size: 14px; }
         .button { appearance: none; border: 0; border-radius: 12px; padding: 10px 14px; font-weight: 600; cursor: pointer; background: #6DAF75; color: white; }
+        .button.secondary { background: #e5e7eb; color: #111827; }
         .button[disabled] { opacity: 0.6; cursor: default; }
         .badges { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
         .chip { display: inline-block; padding: 4px 8px; font-size: 12px; border-radius: 999px; background: #e5e7eb; color: #111827; }
