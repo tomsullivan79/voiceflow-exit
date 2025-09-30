@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { VariableBus } from "@/types/variableBus";
 import { runLLMAgent } from "@/lib/agent/runLLM";
 import { runOptionA } from "@/lib/agent/runOptionA";
+import { routeDecision } from "@/lib/agent/router";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,33 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+function severity(decision?: string): number {
+  switch (decision) {
+    case "dispatch": return 4;
+    case "referral": return 3;
+    case "bring_in": return 2;
+    case "self_help": return 1;
+    case "monitor":
+    case "unknown":
+    default: return 0;
+  }
+}
+
+// Shallow merge sufficient for routing
+function mergeBus(base: VariableBus, patch: Partial<VariableBus> | undefined): VariableBus {
+  if (!patch) return base;
+  return {
+    ...base,
+    ...patch,
+    animal: { ...(base.animal ?? {}), ...(patch as any).animal },
+    species_flags: { ...(base.species_flags ?? {}), ...(patch as any).species_flags },
+    triage: { ...(base.triage ?? {}), ...(patch as any).triage },
+    referral: { ...(base.referral ?? {}), ...(patch as any).referral },
+    org: { ...(base.org ?? {}), ...(patch as any).org },
+    system: { ...(base.system ?? {}), ...(patch as any).system },
+  };
+}
+
 // Health check
 export async function GET(req: NextRequest) {
   const ping = new URL(req.url).searchParams.get("ping");
@@ -43,30 +71,39 @@ export async function POST(req: NextRequest) {
 
     let result: Awaited<ReturnType<typeof runOptionA>>;
     let usedLLM = false;
-    let fallback: "llm_timeout" | undefined;
+    let fallback: "llm_timeout" | "llm_guardrail" | undefined;
 
     if (tryLLM) {
       try {
-        // 20s guard around the LLM path
         result = await withTimeout(runLLMAgent(bus), 20000);
         usedLLM = true;
       } catch (err: any) {
         const msg = (err && (err.message || String(err))) ?? "";
-        // Graceful fallback on timeout
         if (/timeout/i.test(msg)) {
           fallback = "llm_timeout";
           result = await runOptionA(bus);
           usedLLM = false;
         } else {
-          // Non-timeout errors still surface as 500
           console.error("LLM error:", msg);
           return NextResponse.json({ ok: false, error: msg || "llm_error" }, { status: 500 });
         }
       }
     } else {
       result = await runOptionA(bus);
-      usedLLM = false;
     }
+
+    // --- Guardrail: ensure final decision is >= router severity ---
+    const merged = mergeBus(bus, result?.updatedBus);
+    const routed = routeDecision(merged);
+
+    const llmDecision = result?.updatedBus?.triage?.decision ?? "unknown";
+    if (severity(llmDecision) < severity(routed.decision)) {
+      // Replace with deterministic output to guarantee safety parity
+      result = await runOptionA(merged);
+      usedLLM = false;
+      fallback = (fallback ?? "llm_guardrail") as "llm_guardrail";
+    }
+    // --- End guardrail ---
 
     // Normalize referral.validated immutably if a target is present & needed
     const r: any = result?.updatedBus?.referral;

@@ -5,33 +5,38 @@ import { VariableBus } from "@/types/variableBus";
 import { referralSearch } from "@/lib/tools/referralSearch";
 import { instructionsFetch } from "@/lib/tools/instructionsFetch";
 import { statusLookup } from "@/lib/tools/statusLookup";
+import { routeDecision } from "@/lib/agent/router";
 import { AgentResult } from "./runOptionA";
 
 type ToolResult = unknown & { __finalize__?: FinalizeArgs };
 
-const handlers: Record<string, (args: any) => Promise<ToolResult>> = {
-  async referral_search(args) { return referralSearch(args); },
-  async instructions_fetch(args) { return instructionsFetch(args); },
-  async status_lookup(args) { return statusLookup(args); },
-  async finalize(args) { return { __finalize__: args as FinalizeArgs }; },
-};
-
 export async function runLLMAgent(bus: VariableBus): Promise<AgentResult> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  // Tool handlers capture `bus` so route_decision can read it
+  const handlers: Record<string, (args: any) => Promise<ToolResult>> = {
+    async route_decision() {
+      const routed = routeDecision(bus);
+      return routed; // { decision, urgency, reasons, afterHoursNote? }
+    },
+    async referral_search(args) { return referralSearch(args); },
+    async instructions_fetch(args) { return instructionsFetch(args); },
+    async status_lookup(args) { return statusLookup(args); },
+    async finalize(args) { return { __finalize__: args as FinalizeArgs }; },
+  };
 
   const messages: any[] = [
     { role: "system", content: SYSTEM_PROMPT },
     {
       role: "user",
       content:
-        "Here is the Variable Bus JSON. Read it and decide what to do. Always call the tool 'finalize' to return blocks.\n\n" +
+        "Here is the Variable Bus JSON. Call route_decision first, then other tools as needed, then finalize.\n\n" +
         JSON.stringify(bus),
     },
   ];
 
   let final: FinalizeArgs | null = null;
 
-  // Tool loop
   for (let i = 0; i < 6; i++) {
     const resp = await openai.chat.completions.create(
       {
@@ -40,9 +45,8 @@ export async function runLLMAgent(bus: VariableBus): Promise<AgentResult> {
         tools: toolDefs as any,
         tool_choice: "auto",
         temperature: 0.2,
-        // NOTE: do NOT put `timeout` here; it belongs in the second arg.
       },
-      { timeout: 20000 } // ← correct place for timeout
+      { timeout: 20000 }
     );
 
     const msg = resp.choices[0].message;
@@ -73,7 +77,6 @@ export async function runLLMAgent(bus: VariableBus): Promise<AgentResult> {
       continue;
     }
 
-    // If no tool calls, nudge once to finalize
     if (msg.content && i < 5) {
       messages.push({ role: "user", content: "Please call finalize with your blocks and any bus_patch." });
       continue;
