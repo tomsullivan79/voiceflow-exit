@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 7a4ab50 — 19C-1A: add minimal /dev/chat page to call /api/agent/llm and render blocks/updatedBus
-- **Updated (America/Chicago)**: 2025-09-30 10:13 CT
+- **Latest commit**: a69d54f — 19D-1A: log DB change — create public_health_contacts (+ seeds, RLS, indexes)
+- **Updated (America/Chicago)**: 2025-09-30 10:56 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -107,6 +107,7 @@ db/
   CHANGES/
     .gitkeep
     2025-09-28__example.sql
+    2025-09-30_public-health-contacts.sql
     README.md
   SCHEMA.md
   SCHEMA.sql
