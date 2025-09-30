@@ -6,10 +6,10 @@ import { runLLM } from '@/lib/agent/runLLM';
 export const runtime = 'nodejs';
 
 function makeReqId() {
-  return (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2));
+  return globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
 }
 
-// Normalize common UI titles + referral.validated
+// Shallow-normalize titles and referral.validated
 function normalizeBlocks(blocks: any[] = [], decision?: string) {
   for (const b of blocks) {
     if (b?.type === 'summary') b.title = 'Triage Summary';
@@ -20,7 +20,6 @@ function normalizeBlocks(blocks: any[] = [], decision?: string) {
       b.title = b.title || 'Referral';
     }
   }
-  // Also normalize referral.validated when a target exists
   const referral = blocks.find((b) => b?.type === 'referral');
   if (referral?.target && referral.validated !== true) referral.validated = true;
   return blocks;
@@ -28,6 +27,21 @@ function normalizeBlocks(blocks: any[] = [], decision?: string) {
 
 function hasApiKey() {
   return !!process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'undefined';
+}
+
+// Merge original bus with updatedBus so enrichment has full caller/org context.
+function mergeForEnrich(base: any, patch: any) {
+  if (!patch) return base;
+  return {
+    ...base,
+    ...patch,
+    caller: { ...(base?.caller || {}), ...(patch?.caller || {}) },
+    triage: { ...(base?.triage || {}), ...(patch?.triage || {}) },
+    referral: { ...(base?.referral || {}), ...(patch?.referral || {}) },
+    exposure: { ...(base?.exposure || {}), ...(patch?.exposure || {}) },
+    org: { ...(base?.org || {}), ...(patch?.org || {}) },
+    system: { ...(base?.system || {}), ...(patch?.system || {}) },
+  };
 }
 
 export async function GET(req: NextRequest) {
@@ -52,7 +66,7 @@ export async function POST(req: NextRequest) {
   const reqId = makeReqId();
   try {
     const { searchParams } = new URL(req.url);
-    const force = searchParams.get('force'); // expect 'false' for deterministic
+    const force = searchParams.get('force'); // 'false' => deterministic
     const useLLM = !(force === 'false') && hasApiKey();
 
     const { bus } = (await req.json()) as { bus: any };
@@ -63,7 +77,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Race LLM with timeout (20s) when enabled; otherwise run Option A
     let usedLLM = false;
     let fallback: string | null = null;
     let result: { blocks: any[]; updatedBus?: any } = { blocks: [], updatedBus: bus };
@@ -74,24 +87,22 @@ export async function POST(req: NextRequest) {
         setTimeout(() => rej(new Error('llm_timeout')), 20_000)
       );
       try {
-        // runLLM should return { blocks, updatedBus }
         result = await Promise.race([runLLM(bus), timeout]);
       } catch (e: any) {
-        // Timeout or LLM fail → fallback to Option A
         result = await runOptionA(bus);
         fallback = e?.message === 'llm_timeout' ? 'llm_timeout' : 'llm_error';
-        usedLLM = true; // we attempted LLM
+        usedLLM = true;
       }
     } else {
       result = await runOptionA(bus);
     }
 
-    // Normalize titles / referral.validated
     const decision: string | undefined = result?.updatedBus?.triage?.decision;
     result.blocks = normalizeBlocks(result.blocks, decision);
 
-    // Enrich dispatch steps with local public health contact (zip>county)
-    result.blocks = await enrichDispatchSteps(result.blocks, result.updatedBus ?? bus);
+    // ✅ Merge base bus + updatedBus so caller.zip/county are available to enrichment
+    const mergedBus = mergeForEnrich(bus, result.updatedBus);
+    result.blocks = await enrichDispatchSteps(result.blocks, mergedBus);
 
     return new NextResponse(
       JSON.stringify({ ok: true, usedLLM, fallback, result }),
