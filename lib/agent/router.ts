@@ -7,9 +7,15 @@ export type Decision = NonNullable<VariableBus["triage"]["decision"]>;
 export type RouteOutput = {
   decision: Decision;
   urgency: Urgency;
-  reasons: string[];              // human-readable heuristics
-  afterHoursNote?: string;        // if after-hours altered decision/flow
+  reasons: string[];
+  afterHoursNote?: string;
 };
+
+function isBat(bus: VariableBus): boolean {
+  const slug = bus.animal.species_slug ?? "";
+  const name = bus.animal.species_text ?? "";
+  return slug.toLowerCase().includes("bat") || /\bbat\b/i.test(name);
+}
 
 /** Compute medical/public-safety urgency from the Variable Bus. */
 export function assessUrgency(bus: VariableBus): { urgency: Urgency; reasons: string[] } {
@@ -18,19 +24,19 @@ export function assessUrgency(bus: VariableBus): { urgency: Urgency; reasons: st
 
   const rabies = !!bus.species_flags.rabies_vector;
   const dangerous = !!bus.species_flags.dangerous;
-  const contained = !!bus.animal.contained;
+  const contained = bus.animal.contained === true; // treat undefined as uncontained elsewhere
 
-  // Exposure → critical
+  // Rabies/public-health exposure → critical
   if (bus.exposure?.human_bite_possible && rabies) {
     urgency = "critical";
     reasons.push("Possible human bite exposure to a rabies-vector species.");
   }
-  if (bus.exposure?.bat_sleeping_area && (rabies || (bus.animal.species_slug ?? "").includes("bat"))) {
+  if (bus.exposure?.bat_sleeping_area && (rabies || isBat(bus))) {
     urgency = "critical";
-    reasons.push("Bat found near sleeping person — potential exposure.");
+    reasons.push("Bat found near a sleeping or vulnerable person — potential exposure.");
   }
 
-  // Aggression + dangerous + uncontained → high (or critical if already)
+  // Aggression + dangerous + uncontained → high (or critical already)
   if (bus.animal.aggressive_behavior && dangerous && !contained) {
     urgency = urgency === "critical" ? "critical" : "high";
     reasons.push("Aggressive behavior with dangerous species and not contained.");
@@ -58,6 +64,25 @@ export function assessUrgency(bus: VariableBus): { urgency: Urgency; reasons: st
 export function baselineDecision(bus: VariableBus, urgency: Urgency): { decision: Decision; reasons: string[] } {
   const reasons: string[] = [];
 
+  // --- Public-health override for critical rabies exposure ---
+  const exposureCritical =
+    urgency === "critical" &&
+    (bus.exposure?.human_bite_possible === true || bus.exposure?.bat_sleeping_area === true);
+
+  // Treat missing `contained` as uncontained (safer default)
+  const uncontained = bus.animal.contained !== true;
+
+  if (exposureCritical) {
+    if (uncontained) {
+      reasons.push("Public-health override: critical rabies exposure and animal uncontained — route to dispatch.");
+      return { decision: "dispatch", reasons };
+    } else {
+      reasons.push("Public-health override: critical rabies exposure but animal contained — bring_in for controlled intake/coordination.");
+      return { decision: "bring_in", reasons };
+    }
+  }
+  // --- End public-health override ---
+
   // Hard overrides from species flags
   if (bus.species_flags.referral_required) {
     reasons.push("Species requires referral per org policy/partners.");
@@ -77,7 +102,7 @@ export function baselineDecision(bus: VariableBus, urgency: Urgency): { decision
 
   if (bus.animal.situation === "orphaned" || bus.animal.situation === "abandoned") {
     if (bus.animal.age_class === "neonate" || bus.animal.age_class === "juvenile") {
-      reasons.push("Likely orphaned juvenile/neonate — containment and self care.");
+      reasons.push("Likely orphaned juvenile/neonate — containment and self help.");
       return { decision: "self_help", reasons };
     } else {
       reasons.push("Possible misinterpretation; monitor adult/unknown age first.");
@@ -85,10 +110,8 @@ export function baselineDecision(bus: VariableBus, urgency: Urgency): { decision
     }
   }
 
-  // Public safety escalation
-  const dangerous = !!bus.species_flags.dangerous;
-  const contained = !!bus.animal.contained;
-  if (urgency === "critical" && dangerous && !contained) {
+  // Public safety escalation for dangerous + uncontained at high+ urgency
+  if (urgency === "critical" && bus.species_flags.dangerous && uncontained) {
     reasons.push("Critical + dangerous + uncontained → dispatch.");
     return { decision: "dispatch", reasons };
   }
@@ -120,7 +143,6 @@ export function applyAfterHours(
   switch (rule) {
     case "deflect":
     case "info_only": {
-      // Deflect to safe overnight care unless critical
       if (urgency === "critical") {
         reasons.push(`After-hours '${rule}': critical case — escalate to dispatch.`);
         final = "dispatch";
@@ -170,7 +192,6 @@ export function applyAfterHours(
 
 /** Main router: returns decision/urgency/reasons and an after-hours note. */
 export function routeDecision(bus: VariableBus): RouteOutput {
-  // Respect explicit decision if already chosen (except we may after-hours adjust).
   const explicit = bus.triage?.decision && bus.triage.decision !== "unknown" ? (bus.triage.decision as Decision) : undefined;
 
   const u = assessUrgency(bus);
@@ -185,6 +206,6 @@ export function routeDecision(bus: VariableBus): RouteOutput {
     decision: finalDecision,
     urgency: u.urgency,
     reasons: [...u.reasons, ...base.reasons, ...ah.reasons],
-    afterHoursNote: ah.note,
+  ...(ah.note ? { afterHoursNote: ah.note } : {}),
   };
 }
