@@ -16,7 +16,7 @@ type WTResponse = {
 const DEFAULT_BUS = JSON.stringify(
   {
     mode: 'triage',
-    caller: { roles: [] },
+    caller: { roles: [], zip: '55414', county: 'Hennepin County' },
     preferences: {},
     consent: {},
     animal: {
@@ -46,6 +46,37 @@ const DEFAULT_BUS = JSON.stringify(
   2
 );
 
+// --- tiny diff helper (limited to triage/referral) ---
+function flatten(obj: any, prefix = ''): Record<string, any> {
+  const out: Record<string, any> = {};
+  if (obj && typeof obj === 'object') {
+    for (const k of Object.keys(obj)) {
+      const v = obj[k];
+      const path = prefix ? `${prefix}.${k}` : k;
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        Object.assign(out, flatten(v, path));
+      } else {
+        out[path] = v;
+      }
+    }
+  }
+  return out;
+}
+
+function sectionDiff(before: any, after: any) {
+  const a = flatten(before || {});
+  const b = flatten(after || {});
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  const changes: Array<{ path: string; from: any; to: any }> = [];
+  for (const k of keys) {
+    const av = a[k];
+    const bv = b[k];
+    const same = JSON.stringify(av) === JSON.stringify(bv);
+    if (!same) changes.push({ path: k, from: av, to: bv });
+  }
+  return changes;
+}
+
 export default function DevChatPage() {
   const [jsonText, setJsonText] = useState<string>(DEFAULT_BUS);
   const [useLLM, setUseLLM] = useState<boolean>(false);
@@ -53,10 +84,26 @@ export default function DevChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<WTResponse | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
+  const [lastSentBus, setLastSentBus] = useState<any | null>(null);
 
   const endpoint = useMemo(() => {
     return useLLM ? '/api/agent/llm' : '/api/agent/llm?force=false';
   }, [useLLM]);
+
+  function FallbackBadge({ type }: { type?: string | null }) {
+    if (!type) return null;
+    const tone =
+      type === 'llm_guardrail'
+        ? { bg: '#fef3c7', color: '#92400e', label: 'Guardrail' }
+        : type === 'llm_timeout'
+        ? { bg: '#fee2e2', color: '#7f1d1d', label: 'Timeout' }
+        : { bg: '#e5e7eb', color: '#111827', label: type };
+    return (
+      <span className="chip" style={{ background: tone.bg, color: tone.color }}>
+        fallback: {tone.label}
+      </span>
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -71,6 +118,8 @@ export default function DevChatPage() {
       setError('Invalid JSON in Bus textarea. Please fix and try again.');
       return;
     }
+
+    setLastSentBus(parsed);
 
     setLoading(true);
     try {
@@ -94,6 +143,15 @@ export default function DevChatPage() {
       setLoading(false);
     }
   }
+
+  const diffs = useMemo(() => {
+    const before = lastSentBus || {};
+    const after = data?.result?.updatedBus || {};
+    const pick = (x: any) => ({ triage: x?.triage ?? {}, referral: x?.referral ?? {} });
+    const d1 = sectionDiff(pick(before).triage, pick(after).triage);
+    const d2 = sectionDiff(pick(before).referral, pick(after).referral);
+    return { triage: d1, referral: d2 };
+  }, [lastSentBus, data]);
 
   return (
     <div className="wrap">
@@ -132,11 +190,14 @@ export default function DevChatPage() {
           </div>
         </form>
 
-        {requestId && (
-          <div className="badge">
-            x-request-id: <code>{requestId}</code>
-          </div>
-        )}
+        <div className="badges">
+          {requestId && (
+            <span className="chip chip-id">
+              x-request-id: <code>{requestId}</code>
+            </span>
+          )}
+          <FallbackBadge type={data?.fallback} />
+        </div>
 
         {error && (
           <div className="error">
@@ -172,7 +233,6 @@ export default function DevChatPage() {
                         ))}
                       </ul>
                     )}
-                    {/* Generic fallback: show raw block JSON if structure varies */}
                     <details className="raw">
                       <summary>Raw block</summary>
                       <pre>{JSON.stringify(b, null, 2)}</pre>
@@ -188,7 +248,36 @@ export default function DevChatPage() {
             <section className="updated">
               <h3>updatedBus</h3>
               {data?.result?.updatedBus ? (
-                <pre className="pre">{JSON.stringify(data.result.updatedBus, null, 2)}</pre>
+                <>
+                  <pre className="pre">{JSON.stringify(data.result.updatedBus, null, 2)}</pre>
+                  <div className="diffs">
+                    <h4>Diff — triage</h4>
+                    {diffs.triage.length ? (
+                      <ul className="list">
+                        {diffs.triage.map((d, i) => (
+                          <li key={i}>
+                            <code>{d.path}</code>: <span className="del">{JSON.stringify(d.from)}</span> → <span className="ins">{JSON.stringify(d.to)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="muted">No changes in triage.</p>
+                    )}
+
+                    <h4>Diff — referral</h4>
+                    {diffs.referral.length ? (
+                      <ul className="list">
+                        {diffs.referral.map((d, i) => (
+                          <li key={i}>
+                            <code>{d.path}</code>: <span className="del">{JSON.stringify(d.from)}</span> → <span className="ins">{JSON.stringify(d.to)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="muted">No changes in referral.</p>
+                    )}
+                  </div>
+                </>
               ) : (
                 <p className="muted">No updatedBus in response.</p>
               )}
@@ -277,15 +366,21 @@ export default function DevChatPage() {
           opacity: 0.6;
           cursor: default;
         }
-        .badge {
-          display: inline-block;
-          margin: 8px 0 0;
-          background: #eef2ff;
-          color: #3730a3;
-          padding: 4px 8px;
-          border-radius: 999px;
-          font-size: 12px;
+        .badges {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          margin: 10px 0 0;
         }
+        .chip {
+          display: inline-block;
+          padding: 4px 8px;
+          font-size: 12px;
+          border-radius: 999px;
+          background: #e5e7eb;
+          color: #111827;
+        }
+        .chip-id code { font-size: 11px; }
         .error {
           margin-top: 12px;
           padding: 12px;
@@ -326,21 +421,7 @@ export default function DevChatPage() {
           gap: 8px;
           margin-bottom: 8px;
         }
-        .chip {
-          display: inline-block;
-          padding: 2px 8px;
-          font-size: 12px;
-          border-radius: 999px;
-          background: #e5e7eb;
-          color: #111827;
-        }
-        :global(html[data-theme='dark']) .chip {
-          background: #1f2937;
-          color: #e5e7eb;
-        }
-        .list {
-          margin: 8px 0 0 16px;
-        }
+        .list { margin: 8px 0 0 16px; }
         .raw summary {
           cursor: pointer;
           font-size: 12px;
@@ -355,9 +436,10 @@ export default function DevChatPage() {
           background: #0f1115;
           color: #e8eaed;
         }
-        .updated {
-          margin-top: 16px;
-        }
+        .updated { margin-top: 16px; }
+        .diffs { margin-top: 8px; }
+        .del { text-decoration: line-through; opacity: 0.75; }
+        .ins { font-weight: 600; }
       `}</style>
     </div>
   );
