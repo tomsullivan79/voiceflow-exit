@@ -5,6 +5,7 @@ type Block = {
   title?: string;
   text?: string;
   items?: Array<string | any>;
+  lines?: Array<string | any>;
   [k: string]: any;
 };
 
@@ -15,7 +16,8 @@ type BusLike = {
 
 /**
  * If triage.decision === 'dispatch', append public health contact lines to the first steps block.
- * Non-destructive: if no match or not dispatch, returns blocks unchanged.
+ * Supports both shapes: steps.lines[] and steps.items[].
+ * Idempotent-ish: won't re-add if the exact contact name is already present.
  */
 export async function enrichDispatchSteps(
   blocks: Block[] = [],
@@ -27,31 +29,40 @@ export async function enrichDispatchSteps(
   const zip = bus?.caller?.zip;
   const county = bus?.caller?.county;
 
-  // Lookup best local contact (zip preferred, county fallback)
   const { best, via } = await publicHealthLookup({ zip, county });
   if (!best) return blocks;
 
-  // Find (or create) steps block
+  // find/create steps block
   let steps = blocks.find((b) => b?.type === 'steps');
   if (!steps) {
-    steps = { type: 'steps', title: 'Public Health — Do this now', items: [] };
+    steps = { type: 'steps', title: 'Public Health — Do this now', lines: [] as any[] };
     blocks.push(steps);
   }
-  if (!Array.isArray(steps.items)) steps.items = [];
 
-  // Compose readable lines to add under “Contact your local …”
-  const lineMain = `Local contact (${via}): ${best.name}`;
-  const linePhone = best.phone ? `Phone: ${best.phone}` : null;
-  const lineHours = best.hours ? `Hours: ${best.hours}` : null;
-  const lineUrl = best.url ? `URL: ${best.url}` : null;
-  const lineNotes = best.notes ? `Notes: ${best.notes}` : null;
+  // choose which array to append to (prefer existing lines[], else items[], else create lines[])
+  let arr: any[] | null = null;
+  if (Array.isArray(steps.lines)) arr = steps.lines as any[];
+  else if (Array.isArray(steps.items)) arr = steps.items as any[];
+  else {
+    steps.lines = [];
+    arr = steps.lines;
+  }
 
-  // Insert as a small group so they stay together
-  steps.items.push('—', lineMain);
-  if (linePhone) steps.items.push(linePhone);
-  if (lineHours) steps.items.push(lineHours);
-  if (lineUrl) steps.items.push(lineUrl);
-  if (lineNotes) steps.items.push(lineNotes);
+  // avoid duplicates if already appended
+  const marker = `Local contact (${via}): ${best.name}`;
+  const already = arr.some((s) => typeof s === 'string' && s.includes(best.name));
+  if (already) return blocks;
+
+  const extras = [
+    '—',
+    marker,
+    best.phone ? `Phone: ${best.phone}` : null,
+    best.hours ? `Hours: ${best.hours}` : null,
+    best.url ? `URL: ${best.url}` : null,
+    best.notes ? `Notes: ${best.notes}` : null,
+  ].filter(Boolean) as string[];
+
+  arr.push(...extras);
 
   return blocks;
 }
