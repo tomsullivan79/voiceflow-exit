@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 1bd209f — 19D-1D: add read-only /dev/phc list and API
-- **Updated (America/Chicago)**: 2025-09-30 16:08 CT
+- **Latest commit**: 23cc852 — 19C-1E: add Presets to /dev/chat (osprey referral, bat dispatch, raccoon after-hours)
+- **Updated (America/Chicago)**: 2025-09-30 16:50 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
