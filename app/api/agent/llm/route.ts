@@ -38,7 +38,7 @@ function severity(decision?: string): number {
   }
 }
 
-// Shallow merge sufficient for routing
+// Shallow merge sufficient for routing parity checks
 function mergeBus(base: VariableBus, patch: Partial<VariableBus> | undefined): VariableBus {
   if (!patch) return base;
   return {
@@ -75,11 +75,13 @@ export async function POST(req: NextRequest) {
 
     if (tryLLM) {
       try {
+        // 20s guard around the LLM path
         result = await withTimeout(runLLMAgent(bus), 20000);
         usedLLM = true;
       } catch (err: any) {
         const msg = (err && (err.message || String(err))) ?? "";
         if (/timeout/i.test(msg)) {
+          // Graceful fallback on timeout
           fallback = "llm_timeout";
           result = await runOptionA(bus);
           usedLLM = false;
@@ -92,13 +94,11 @@ export async function POST(req: NextRequest) {
       result = await runOptionA(bus);
     }
 
-    // --- Guardrail: ensure final decision is >= router severity ---
+    // --- Guardrail: never allow weaker decision than router ---
     const merged = mergeBus(bus, result?.updatedBus);
     const routed = routeDecision(merged);
-
     const llmDecision = result?.updatedBus?.triage?.decision ?? "unknown";
     if (severity(llmDecision) < severity(routed.decision)) {
-      // Replace with deterministic output to guarantee safety parity
       result = await runOptionA(merged);
       usedLLM = false;
       fallback = (fallback ?? "llm_guardrail") as "llm_guardrail";
@@ -113,6 +113,22 @@ export async function POST(req: NextRequest) {
         referral: { ...r, validated: true },
       };
     }
+
+    // --- Optional polish: normalize block titles for consistent UI ---
+    if (Array.isArray(result?.blocks)) {
+      const decision = result?.updatedBus?.triage?.decision;
+      const stepsTitle = decision === "dispatch" ? "Public Health — Do this now" : "Do this next";
+      result.blocks = result.blocks.map((b: any) => {
+        if (b?.type === "summary" && !b.title) {
+          return { ...b, title: "Triage Summary" };
+        }
+        if (b?.type === "steps" && !b.title) {
+          return { ...b, title: stepsTitle };
+        }
+        return b;
+      });
+    }
+    // --- End polish ---
 
     return NextResponse.json({ ok: true, usedLLM, ...(fallback ? { fallback } : {}), result });
   } catch (err: any) {
