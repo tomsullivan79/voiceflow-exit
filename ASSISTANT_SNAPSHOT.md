@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: a736f63 — 19B polish: dispatch => public-health playbook + UI title; keep referral lines w/ Directions URL
-- **Updated (America/Chicago)**: 2025-09-29 17:21 CT
+- **Latest commit**: ff17467 — Router: stronger public-health override (treat missing contained as uncontained; detect bat via slug/name)
+- **Updated (America/Chicago)**: 2025-09-29 21:30 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
