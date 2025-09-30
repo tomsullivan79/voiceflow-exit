@@ -3,10 +3,11 @@ export function normalizeResult(
   baseBus: any
 ) {
   if (!result) return result;
+
   const updated = result.updatedBus ?? {};
   const bus = baseBus ?? {};
 
-  // Ensure triage and common flags exist
+  // Ensure triage object exists
   updated.triage = updated.triage ?? {};
 
   // Decide when caution is required:
@@ -22,14 +23,16 @@ export function normalizeResult(
     }
   }
 
-  // Normalize referral block: title + directions_url
+  // -------------------------------
+  // Normalize referral in BLOCKS
+  // -------------------------------
   if (Array.isArray(result.blocks)) {
     for (const b of result.blocks) {
       if (b?.type === 'referral') {
         // Title default
         if (!b.title) b.title = 'Referral';
 
-        // Move nested directions_url -> top-level
+        // Move nested directions_url -> top-level within the block
         const nested = b?.target?.directions_url;
         if (nested && !b?.directions_url) {
           b.directions_url = nested;
@@ -38,6 +41,22 @@ export function normalizeResult(
           try { delete b.target.directions_url; } catch {}
         }
       }
+    }
+  }
+
+  // -------------------------------
+  // Normalize referral in UPDATED BUS
+  // -------------------------------
+  if (updated?.referral) {
+    const r = updated.referral;
+
+    // Ensure only top-level referral.directions_url remains
+    const nested = r?.target?.directions_url;
+    if (nested && !r?.directions_url) {
+      r.directions_url = nested;
+    }
+    if (r?.target && 'directions_url' in r.target) {
+      try { delete r.target.directions_url; } catch {}
     }
   }
 
