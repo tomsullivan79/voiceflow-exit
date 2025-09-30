@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { enrichDispatchSteps } from '@/lib/tools/enrichDispatchSteps';
 import { runOptionA } from '@/lib/agent/runOptionA';
 import { runLLM } from '@/lib/agent/runLLM';
+import { normalizeResult } from '@/lib/agent/normalizeResult';
 
 export const runtime = 'nodejs';
 
@@ -9,7 +10,7 @@ function makeReqId() {
   return globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
 }
 
-// Shallow-normalize titles and referral.validated
+// Shallow title normalization + referral.validated
 function normalizeBlocks(blocks: any[] = [], decision?: string) {
   for (const b of blocks) {
     if (b?.type === 'summary') b.title = 'Triage Summary';
@@ -41,6 +42,7 @@ function mergeForEnrich(base: any, patch: any) {
     exposure: { ...(base?.exposure || {}), ...(patch?.exposure || {}) },
     org: { ...(base?.org || {}), ...(patch?.org || {}) },
     system: { ...(base?.system || {}), ...(patch?.system || {}) },
+    species_flags: { ...(base?.species_flags || {}), ...(patch?.species_flags || {}) },
   };
 }
 
@@ -97,10 +99,14 @@ export async function POST(req: NextRequest) {
       result = await runOptionA(bus);
     }
 
+    // Existing normalization for titles / referral.validated
     const decision: string | undefined = result?.updatedBus?.triage?.decision;
     result.blocks = normalizeBlocks(result.blocks, decision);
 
-    // ✅ Merge base bus + updatedBus so caller.zip/county are available to enrichment
+    // NEW: normalize shapes (caution_required, referral URL dedupe, title safety)
+    result = normalizeResult(result, bus);
+
+    // Enrich dispatch steps with local public health contact (zip>county)
     const mergedBus = mergeForEnrich(bus, result.updatedBus);
     result.blocks = await enrichDispatchSteps(result.blocks, mergedBus);
 
