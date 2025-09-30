@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 33c7b2e — 19C-1C: /dev/chat UI — fallback badges + triage/referral diff viewer
-- **Updated (America/Chicago)**: 2025-09-30 11:22 CT
+- **Latest commit**: 0bacc51 — 19D-1C: enrich dispatch steps with local public-health contact (zip>county)
+- **Updated (America/Chicago)**: 2025-09-30 11:52 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -87,6 +87,7 @@ lib/
     runLLM.ts
     runOptionA.ts
   tools/
+    enrichDispatchSteps.ts
     instructionsFetch.ts
     publicHealthLookup.ts
     referralSearch.ts
