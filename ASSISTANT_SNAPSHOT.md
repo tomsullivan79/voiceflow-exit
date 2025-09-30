@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: b5ac3c7 — 19D-1C-Fix2: merge base bus with updatedBus before dispatch enrichment
-- **Updated (America/Chicago)**: 2025-09-30 13:27 CT
+- **Latest commit**: 4f58d34 — 19C-1D: render steps.lines in /dev/chat so dispatch contact enrichment is visible
+- **Updated (America/Chicago)**: 2025-09-30 13:57 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
