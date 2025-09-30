@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 514d235 — Polish: normalize steps/summary titles; keep LLM timeout fallback, guardrail, and referral.validated normalization
-- **Updated (America/Chicago)**: 2025-09-29 21:53 CT
+- **Latest commit**: 7a4ab50 — 19C-1A: add minimal /dev/chat page to call /api/agent/llm and render blocks/updatedBus
+- **Updated (America/Chicago)**: 2025-09-30 10:13 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -49,6 +49,7 @@ app/
     PolicyBanner.tsx
   dev/
     agent/
+    chat/
     router/
     tools/
     variable-bus/
