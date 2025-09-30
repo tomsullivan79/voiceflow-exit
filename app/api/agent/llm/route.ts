@@ -1,138 +1,107 @@
-// app/api/agent/llm/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { VariableBus } from "@/types/variableBus";
-import { runLLMAgent } from "@/lib/agent/runLLM";
-import { runOptionA } from "@/lib/agent/runOptionA";
-import { routeDecision } from "@/lib/agent/router";
+import { NextRequest, NextResponse } from 'next/server';
+import { enrichDispatchSteps } from '@/lib/tools/enrichDispatchSteps';
+import { runOptionA } from '@/lib/agent/runOptionA';
+import { runLLM } from '@/lib/agent/runLLM';
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const runtime = 'nodejs';
 
-function parseForce(req: NextRequest, bodyForce: unknown): boolean | undefined {
-  const q = new URL(req.url).searchParams.get("force");
-  if (q === "true") return true;
-  if (q === "false") return false;
-  if (typeof bodyForce === "boolean") return bodyForce;
-  return undefined;
+function makeReqId() {
+  return (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2));
 }
 
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms);
-    p.then(
-      (v) => { clearTimeout(t); resolve(v); },
-      (e) => { clearTimeout(t); reject(e); }
-    );
+// Normalize common UI titles + referral.validated
+function normalizeBlocks(blocks: any[] = [], decision?: string) {
+  for (const b of blocks) {
+    if (b?.type === 'summary') b.title = 'Triage Summary';
+    if (b?.type === 'steps') {
+      b.title = decision === 'dispatch' ? 'Public Health — Do this now' : 'Do this next';
+    }
+    if (b?.type === 'referral') {
+      b.title = b.title || 'Referral';
+    }
+  }
+  // Also normalize referral.validated when a target exists
+  const referral = blocks.find((b) => b?.type === 'referral');
+  if (referral?.target && referral.validated !== true) referral.validated = true;
+  return blocks;
+}
+
+function hasApiKey() {
+  return !!process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'undefined';
+}
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const ping = searchParams.get('ping');
+  const reqId = makeReqId();
+
+  if (ping === '1') {
+    return new NextResponse(JSON.stringify({ ok: true, usedLLM: false, pong: true }), {
+      status: 200,
+      headers: { 'content-type': 'application/json', 'x-request-id': reqId },
+    });
+  }
+
+  return new NextResponse(JSON.stringify({ ok: true }), {
+    status: 200,
+    headers: { 'content-type': 'application/json', 'x-request-id': reqId },
   });
 }
 
-function severity(decision?: string): number {
-  switch (decision) {
-    case "dispatch": return 4;
-    case "referral": return 3;
-    case "bring_in": return 2;
-    case "self_help": return 1;
-    case "monitor":
-    case "unknown":
-    default: return 0;
-  }
-}
-
-// Shallow merge sufficient for routing parity checks
-function mergeBus(base: VariableBus, patch: Partial<VariableBus> | undefined): VariableBus {
-  if (!patch) return base;
-  return {
-    ...base,
-    ...patch,
-    animal: { ...(base.animal ?? {}), ...(patch as any).animal },
-    species_flags: { ...(base.species_flags ?? {}), ...(patch as any).species_flags },
-    triage: { ...(base.triage ?? {}), ...(patch as any).triage },
-    referral: { ...(base.referral ?? {}), ...(patch as any).referral },
-    org: { ...(base.org ?? {}), ...(patch as any).org },
-    system: { ...(base.system ?? {}), ...(patch as any).system },
-  };
-}
-
-// Health check
-export async function GET(req: NextRequest) {
-  const ping = new URL(req.url).searchParams.get("ping");
-  if (ping) return NextResponse.json({ ok: true, pong: true });
-  return NextResponse.json({ ok: false, error: "POST a bus to this endpoint." }, { status: 405 });
-}
-
 export async function POST(req: NextRequest) {
+  const reqId = makeReqId();
   try {
-    const body = await req.json().catch(() => ({}));
-    const bus = (body?.bus || {}) as VariableBus;
-    const force = parseForce(req, body?.force);
+    const { searchParams } = new URL(req.url);
+    const force = searchParams.get('force'); // expect 'false' for deterministic
+    const useLLM = !(force === 'false') && hasApiKey();
 
-    const openAIConfigured = !!process.env.OPENAI_API_KEY;
-    const tryLLM = openAIConfigured && force !== false;
+    const { bus } = (await req.json()) as { bus: any };
+    if (!bus) {
+      return new NextResponse(JSON.stringify({ ok: false, error: 'Missing bus' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json', 'x-request-id': reqId },
+      });
+    }
 
-    let result: Awaited<ReturnType<typeof runOptionA>>;
+    // Race LLM with timeout (20s) when enabled; otherwise run Option A
     let usedLLM = false;
-    let fallback: "llm_timeout" | "llm_guardrail" | undefined;
+    let fallback: string | null = null;
+    let result: { blocks: any[]; updatedBus?: any } = { blocks: [], updatedBus: bus };
 
-    if (tryLLM) {
+    if (useLLM) {
+      usedLLM = true;
+      const timeout = new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error('llm_timeout')), 20_000)
+      );
       try {
-        // 20s guard around the LLM path
-        result = await withTimeout(runLLMAgent(bus), 20000);
-        usedLLM = true;
-      } catch (err: any) {
-        const msg = (err && (err.message || String(err))) ?? "";
-        if (/timeout/i.test(msg)) {
-          // Graceful fallback on timeout
-          fallback = "llm_timeout";
-          result = await runOptionA(bus);
-          usedLLM = false;
-        } else {
-          console.error("LLM error:", msg);
-          return NextResponse.json({ ok: false, error: msg || "llm_error" }, { status: 500 });
-        }
+        // runLLM should return { blocks, updatedBus }
+        result = await Promise.race([runLLM(bus), timeout]);
+      } catch (e: any) {
+        // Timeout or LLM fail → fallback to Option A
+        result = await runOptionA(bus);
+        fallback = e?.message === 'llm_timeout' ? 'llm_timeout' : 'llm_error';
+        usedLLM = true; // we attempted LLM
       }
     } else {
       result = await runOptionA(bus);
     }
 
-    // --- Guardrail: never allow weaker decision than router ---
-    const merged = mergeBus(bus, result?.updatedBus);
-    const routed = routeDecision(merged);
-    const llmDecision = result?.updatedBus?.triage?.decision ?? "unknown";
-    if (severity(llmDecision) < severity(routed.decision)) {
-      result = await runOptionA(merged);
-      usedLLM = false;
-      fallback = (fallback ?? "llm_guardrail") as "llm_guardrail";
-    }
-    // --- End guardrail ---
+    // Normalize titles / referral.validated
+    const decision: string | undefined = result?.updatedBus?.triage?.decision;
+    result.blocks = normalizeBlocks(result.blocks, decision);
 
-    // Normalize referral.validated immutably if a target is present & needed
-    const r: any = result?.updatedBus?.referral;
-    if (r && typeof r === "object" && r.needed && r.target) {
-      result.updatedBus = {
-        ...result.updatedBus,
-        referral: { ...r, validated: true },
-      };
-    }
+    // Enrich dispatch steps with local public health contact (zip>county)
+    result.blocks = await enrichDispatchSteps(result.blocks, result.updatedBus ?? bus);
 
-    // --- Optional polish: normalize block titles for consistent UI ---
-    if (Array.isArray(result?.blocks)) {
-      const decision = result?.updatedBus?.triage?.decision;
-      const stepsTitle = decision === "dispatch" ? "Public Health — Do this now" : "Do this next";
-      result.blocks = result.blocks.map((b: any) => {
-        if (b?.type === "summary" && !b.title) {
-          return { ...b, title: "Triage Summary" };
-        }
-        if (b?.type === "steps" && !b.title) {
-          return { ...b, title: stepsTitle };
-        }
-        return b;
-      });
-    }
-    // --- End polish ---
-
-    return NextResponse.json({ ok: true, usedLLM, ...(fallback ? { fallback } : {}), result });
+    return new NextResponse(
+      JSON.stringify({ ok: true, usedLLM, fallback, result }),
+      { status: 200, headers: { 'content-type': 'application/json', 'x-request-id': reqId } }
+    );
   } catch (err: any) {
-    const msg = (err && (err.message || String(err))) ?? "unknown_error";
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    const error = err?.message ?? 'Server error';
+    return new NextResponse(JSON.stringify({ ok: false, error }), {
+      status: 500,
+      headers: { 'content-type': 'application/json', 'x-request-id': reqId },
+    });
   }
 }
