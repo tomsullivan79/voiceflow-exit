@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 4f58d34 — 19C-1D: render steps.lines in /dev/chat so dispatch contact enrichment is visible
-- **Updated (America/Chicago)**: 2025-09-30 13:57 CT
+- **Latest commit**: 33e8851 — 19C-1B: server normalizer (caution_required, referral title, directions_url dedupe)
+- **Updated (America/Chicago)**: 2025-09-30 14:20 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -82,6 +82,7 @@ components/
   VersionChip.tsx
 lib/
   agent/
+    normalizeResult.ts
     promptContract.ts
     router.ts
     runLLM.ts
