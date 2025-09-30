@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 3f32128 — LLM parity: add route_decision tool + server guardrail to never downgrade below router; fallback to OptionA on downgrade
-- **Updated (America/Chicago)**: 2025-09-29 21:45 CT
+- **Latest commit**: 514d235 — Polish: normalize steps/summary titles; keep LLM timeout fallback, guardrail, and referral.validated normalization
+- **Updated (America/Chicago)**: 2025-09-29 21:53 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
