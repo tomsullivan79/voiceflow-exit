@@ -98,6 +98,11 @@ function sectionDiff(before: any, after: any) {
   return changes;
 }
 
+// shell-escape for single-quoted strings: abc'def -> 'abc'"'"'def'
+function shSingleQuote(s: string) {
+  return `'${s.replace(/'/g, `'\"'\"'`)}'`;
+}
+
 export default function DevChatPage() {
   const [jsonText, setJsonText] = useState<string>(DEFAULT_BUS);
   const [useLLM, setUseLLM] = useState<boolean>(false);
@@ -107,6 +112,7 @@ export default function DevChatPage() {
   const [requestId, setRequestId] = useState<string | null>(null);
   const [lastSentBus, setLastSentBus] = useState<any | null>(null);
   const [presetSel, setPresetSel] = useState<string>('osprey_referral');
+  const [copiedCurl, setCopiedCurl] = useState<boolean>(false);
 
   // Optional: ?preset=bat_dispatch
   useEffect(() => {
@@ -169,6 +175,43 @@ export default function DevChatPage() {
     }
   }
 
+  function handleLoadPreset() {
+    const obj = PRESETS[presetSel] ?? PRESETS.osprey_referral;
+    setJsonText(JSON.stringify(obj, null, 2));
+  }
+
+  async function handleCopyCurl() {
+    setError(null);
+    try {
+      // Prefer current textarea; fall back to last sent bus if textarea is broken
+      let payloadText = '';
+      try {
+        const parsed = JSON.parse(jsonText);
+        payloadText = JSON.stringify({ bus: parsed }, null, 2);
+      } catch {
+        if (lastSentBus) {
+          payloadText = JSON.stringify({ bus: lastSentBus }, null, 2);
+        } else {
+          throw new Error('Invalid JSON; fix the textarea or send once before copying cURL.');
+        }
+      }
+
+      const origin = window.location.origin.replace(/\/$/, '');
+      const url = `${origin}${endpoint}`;
+      const curl = [
+        `curl -iS -m 25 ${shSingleQuote(url)}`,
+        `  -H 'content-type: application/json'`,
+        `  --data ${shSingleQuote(payloadText)}`
+      ].join(' \\\n');
+
+      await navigator.clipboard.writeText(curl);
+      setCopiedCurl(true);
+      setTimeout(() => setCopiedCurl(false), 1500);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to build cURL');
+    }
+  }
+
   const diffs = useMemo(() => {
     const before = lastSentBus || {};
     const after = data?.result?.updatedBus || {};
@@ -178,11 +221,6 @@ export default function DevChatPage() {
       referral: sectionDiff(pick(before).referral, pick(after).referral)
     };
   }, [lastSentBus, data]);
-
-  function handleLoadPreset() {
-    const obj = PRESETS[presetSel] ?? PRESETS.osprey_referral;
-    setJsonText(JSON.stringify(obj, null, 2));
-  }
 
   return (
     <div className="wrap">
@@ -201,7 +239,7 @@ export default function DevChatPage() {
             </select>
             <button type="button" onClick={handleLoadPreset} className="button secondary">Load preset</button>
           </div>
-          <p className="muted small">Loading replaces the textarea JSON. Tip: add <code>?preset=bat_dispatch</code> to the URL.</p>
+          <p className="muted small">Tip: add <code>?preset=bat_dispatch</code> to the URL to auto-load on refresh.</p>
         </div>
 
         {/* Editor */}
@@ -223,13 +261,18 @@ export default function DevChatPage() {
               <input type="checkbox" checked={useLLM} onChange={(e) => setUseLLM(e.target.checked)} />
               <span>Use LLM (unchecked = deterministic router)</span>
             </label>
-            <button type="submit" disabled={loading} className="button">{loading ? 'Sending…' : 'Send to /api/agent/llm'}</button>
+
+            <div className="row" style={{ gap: 8 }}>
+              <button type="button" onClick={handleCopyCurl} className="button secondary">Copy as cURL</button>
+              <button type="submit" disabled={loading} className="button">{loading ? 'Sending…' : 'Send to /api/agent/llm'}</button>
+            </div>
           </div>
         </form>
 
         <div className="badges">
           {requestId && (<span className="chip chip-id">x-request-id: <code>{requestId}</code></span>)}
           <FallbackBadge type={data?.fallback} />
+          {copiedCurl && (<span className="chip" style={{ background: '#e6f6ea', color: '#065f46' }}>Copied cURL ✓</span>)}
         </div>
 
         {error && <div className="error"><strong>Error:</strong> {error}</div>}
@@ -325,18 +368,14 @@ export default function DevChatPage() {
         .muted { color: #6b7280; margin: 0 0 16px; }
         .small { font-size: 12px; margin-top: 6px; }
         .presets { margin: 6px 0 12px; }
-        .select {
-          min-width: 260px;
-          padding: 8px 10px;
-          border-radius: 10px;
-          border: 1px solid #e5e7eb;
-          background: #fff; color: #111;
-        }
+        .select { min-width: 260px; padding: 8px 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; color: #111; }
         :global(html[data-theme='dark']) .select { background: #0f1115; color: #e8eaed; border-color: #1f2937; }
         .form { display: grid; gap: 12px; margin-bottom: 16px; }
         .label { display: grid; gap: 8px; font-weight: 600; }
-        .textarea { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 13px; padding: 10px 12px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111; }
+        .textarea {
+          width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 13px; padding: 10px 12px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111;
+        }
         :global(html[data-theme='dark']) .textarea { background: #0f1115; color: #e8eaed; border-color: #1f2937; }
         .row { display: flex; align-items: center; gap: 12px; }
         .checkbox { display: flex; align-items: center; gap: 8px; font-size: 14px; }
