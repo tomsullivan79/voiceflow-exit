@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: f9c7318 — 19C-1G: add 'Reset to preset' to /dev/chat (restores textarea to current preset and clears state)
-- **Updated (America/Chicago)**: 2025-10-01 14:09 CT
+- **Latest commit**: 24ab253 — 19E-1: prefer curated instruction Markdown (content/instructions/**) with safe fallback
+- **Updated (America/Chicago)**: 2025-10-01 15:08 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -89,6 +89,7 @@ lib/
     runLLM.ts
     runOptionA.ts
   tools/
+    curatedInstructions.ts
     enrichDispatchSteps.ts
     instructionsFetch.ts
     publicHealthLookup.ts
@@ -132,6 +133,11 @@ assistant/
 ASSISTANT_SNAPSHOT.md
 README.md
 White_Sage.png
+content/
+  instructions/
+    patient_status/
+    triage/
+    README.md
 data/
   raw/
     species-meta-lookup.yaml
