@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 46877db — 19C-1F-Diag2: add /api/dev/diag/openai-chat (minimal OpenAI ping)
-- **Updated (America/Chicago)**: 2025-09-30 20:49 CT
+- **Latest commit**: 5cefd3e — 19C-1F-Diag3: expose llm_error_detail when ?debug=1 on /api/agent/llm
+- **Updated (America/Chicago)**: 2025-09-30 22:02 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
