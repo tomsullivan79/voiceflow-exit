@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { enrichDispatchSteps } from '@/lib/tools/enrichDispatchSteps';
 import { runOptionA } from '@/lib/agent/runOptionA';
 import { normalizeResult } from '@/lib/agent/normalizeResult';
+import { loadCuratedSteps } from '@/lib/tools/curatedInstructions';
 
 export const runtime = 'nodejs';
 
@@ -13,9 +14,7 @@ function makeReqId() {
 async function getRunLLM(): Promise<(bus: any) => Promise<{ blocks: any[]; updatedBus?: any }>> {
   const mod: any = await import('@/lib/agent/runLLM');
   const fn = mod?.runLLM ?? mod?.default;
-  if (typeof fn !== 'function') {
-    throw new Error('runLLM_not_found'); // will be surfaced via ?debug=1
-  }
+  if (typeof fn !== 'function') throw new Error('runLLM_not_found');
   return fn;
 }
 
@@ -96,7 +95,7 @@ export async function POST(req: NextRequest) {
       usedLLM = true;
       const timeout = new Promise<never>((_, rej) => setTimeout(() => rej(new Error('llm_timeout')), 20_000));
       try {
-        const runLLM = await getRunLLM(); // <-- dynamic, export-agnostic
+        const runLLM = await getRunLLM();
         result = await Promise.race([runLLM(bus), timeout]);
       } catch (e: any) {
         result = await runOptionA(bus);
@@ -114,14 +113,32 @@ export async function POST(req: NextRequest) {
       result = await runOptionA(bus);
     }
 
-    // Normalize shapes & blocks
+    // Standard title/validated normalization
     const decision: string | undefined = result?.updatedBus?.triage?.decision;
     result.blocks = normalizeBlocks(result.blocks, decision);
+
+    // Shape normalization (caution_required, referral URL dedupe)
     result = normalizeResult(result, bus);
 
-    // Enrich dispatch steps with local public-health contact (zip > county)
-    const mergedBus = mergeForEnrich(bus, result.updatedBus);
-    result.blocks = await enrichDispatchSteps(result.blocks, mergedBus);
+    // ---- NEW: inject curated steps, if available ----
+    const mergedBusForContent = mergeForEnrich(bus, result.updatedBus);
+    const curated = await loadCuratedSteps(mergedBusForContent);
+    if (curated) {
+      let steps = result.blocks.find((b) => b?.type === 'steps');
+      if (!steps) {
+        steps = {
+          type: 'steps',
+          title: decision === 'dispatch' ? 'Public Health — Do this now' : 'Do this next',
+          lines: []
+        };
+        result.blocks.push(steps);
+      }
+      steps.lines = Array.isArray(steps.lines) ? curated.lines.slice() : curated.lines.slice();
+      if (curated.title) steps.title = curated.title;
+    }
+
+    // Keep existing public-health contact enrichment last (so it appends neatly)
+    result.blocks = await enrichDispatchSteps(result.blocks, mergedBusForContent);
 
     return new NextResponse(
       JSON.stringify({ ok: true, usedLLM, fallback, result, ...(llm_error_detail ? { llm_error_detail } : {}) }),
