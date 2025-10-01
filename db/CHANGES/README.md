@@ -1,10 +1,17 @@
-# DB Change Log (append-only)
+# DB Change Snippets
 
-- One file per change you run in Supabase SQL Editor.
-- Name format: `YYYY-MM-DD_short-description.sql`
-- Paste the exact SQL you executed (CREATE/ALTER/INDEX/etc).
-- Keep comments explaining why the change was made.
+Source of truth for schema is `db/SCHEMA.sql` (exported via Supabase CLI).
+This folder tracks the **exact SQL you executed** in Supabase for each change.
 
-## Example filenames
-- 2025-09-27_add-species-meta.sql
-- 2025-10-02_link-inbound-sms-to-cases.sql
+## Naming
+`YYYY-MM-DD_short-description.sql` (one change per file; add multiple files if you run separate edits the same day).
+
+## Workflow
+1) Run SQL in Supabase SQL Editor (apply change).
+2) Paste the same SQL into a new file here with the naming above.
+3) Re-export DDL to `db/SCHEMA.sql` via `supabase db dump --linked --schema public --schema-only --file db/SCHEMA.sql`.
+4) Commit & push. CI will refresh `db/SCHEMA.md` and `assistant/data-model.md`.
+
+## Notes
+- Don’t try to “replay” these as migrations; they are an audit trail.
+- If you revert something, add a new file with the revert SQL; don’t edit history files.
