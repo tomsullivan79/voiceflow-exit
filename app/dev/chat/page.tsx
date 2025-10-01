@@ -180,6 +180,15 @@ export default function DevChatPage() {
     setJsonText(JSON.stringify(obj, null, 2));
   }
 
+  function handleResetToPreset() {
+    const obj = PRESETS[presetSel] ?? PRESETS.osprey_referral;
+    setError(null);
+    setData(null);
+    setRequestId(null);
+    setLastSentBus(null);
+    setJsonText(JSON.stringify(obj, null, 2));
+  }
+
   async function handleCopyCurl() {
     setError(null);
     try {
@@ -237,7 +246,10 @@ export default function DevChatPage() {
               <option value="bat_dispatch">Bat — dispatch (sleeping area, uncontained)</option>
               <option value="raccoon_afterhours_deflect">Raccoon — after-hours deflect</option>
             </select>
-            <button type="button" onClick={handleLoadPreset} className="button secondary">Load preset</button>
+            <div className="row" style={{ gap: 8 }}>
+              <button type="button" onClick={handleLoadPreset} className="button secondary">Load preset</button>
+              <button type="button" onClick={handleResetToPreset} className="button tertiary">Reset to preset</button>
+            </div>
           </div>
           <p className="muted small">Tip: add <code>?preset=bat_dispatch</code> to the URL to auto-load on refresh.</p>
         </div>
@@ -377,10 +389,11 @@ export default function DevChatPage() {
           font-size: 13px; padding: 10px 12px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111;
         }
         :global(html[data-theme='dark']) .textarea { background: #0f1115; color: #e8eaed; border-color: #1f2937; }
-        .row { display: flex; align-items: center; gap: 12px; }
+        .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .checkbox { display: flex; align-items: center; gap: 8px; font-size: 14px; }
         .button { appearance: none; border: 0; border-radius: 12px; padding: 10px 14px; font-weight: 600; cursor: pointer; background: #6DAF75; color: white; }
         .button.secondary { background: #e5e7eb; color: #111827; }
+        .button.tertiary { background: #f3f4f6; color: #111827; }
         .button[disabled] { opacity: 0.6; cursor: default; }
         .badges { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
         .chip { display: inline-block; padding: 4px 8px; font-size: 12px; border-radius: 999px; background: #e5e7eb; color: #111827; }
