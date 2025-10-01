@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 88acc41 — 19C-1F: add 'Copy as cURL' to /dev/chat (uses current textarea payload and LLM toggle)
-- **Updated (America/Chicago)**: 2025-09-30 17:47 CT
+- **Latest commit**: 9aea00a — 19C-1F-Diag: add /api/dev/diag/llm to verify OPENAI_API_KEY visibility in runtime
+- **Updated (America/Chicago)**: 2025-09-30 20:34 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
