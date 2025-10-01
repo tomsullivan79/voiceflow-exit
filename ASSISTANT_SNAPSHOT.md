@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: e1d1286 — LLM path: export-safe runLLM (named + default), parity via runOptionA, tiny OpenAI ping
-- **Updated (America/Chicago)**: 2025-10-01 12:47 CT
+- **Latest commit**: f9c7318 — 19C-1G: add 'Reset to preset' to /dev/chat (restores textarea to current preset and clears state)
+- **Updated (America/Chicago)**: 2025-10-01 14:09 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
