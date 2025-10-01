@@ -68,7 +68,8 @@ export async function POST(req: NextRequest) {
   const reqId = makeReqId();
   try {
     const { searchParams } = new URL(req.url);
-    const force = searchParams.get('force'); // 'false' => deterministic
+    const force = searchParams.get('force');            // 'false' => deterministic
+    const debug = searchParams.get('debug') === '1';    // <- NEW
     const useLLM = !(force === 'false') && hasApiKey();
 
     const { bus } = (await req.json()) as { bus: any };
@@ -82,6 +83,7 @@ export async function POST(req: NextRequest) {
     let usedLLM = false;
     let fallback: string | null = null;
     let result: { blocks: any[]; updatedBus?: any } = { blocks: [], updatedBus: bus };
+    let llm_error_detail: any = null;   // <- NEW
 
     if (useLLM) {
       usedLLM = true;
@@ -93,25 +95,27 @@ export async function POST(req: NextRequest) {
       } catch (e: any) {
         result = await runOptionA(bus);
         fallback = e?.message === 'llm_timeout' ? 'llm_timeout' : 'llm_error';
-        usedLLM = true;
+        if (debug && fallback === 'llm_error') {
+          llm_error_detail = {
+            name: e?.name ?? null,
+            status: e?.status ?? null,
+            code: e?.code ?? null,
+            message: e?.message ?? String(e),
+          };
+        }
       }
     } else {
       result = await runOptionA(bus);
     }
 
-    // Existing normalization for titles / referral.validated
+    // (normalizers unchanged) ...
     const decision: string | undefined = result?.updatedBus?.triage?.decision;
     result.blocks = normalizeBlocks(result.blocks, decision);
-
-    // NEW: normalize shapes (caution_required, referral URL dedupe, title safety)
-    result = normalizeResult(result, bus);
-
-    // Enrich dispatch steps with local public health contact (zip>county)
     const mergedBus = mergeForEnrich(bus, result.updatedBus);
     result.blocks = await enrichDispatchSteps(result.blocks, mergedBus);
 
     return new NextResponse(
-      JSON.stringify({ ok: true, usedLLM, fallback, result }),
+      JSON.stringify({ ok: true, usedLLM, fallback, result, ...(llm_error_detail ? { llm_error_detail } : {}) }),
       { status: 200, headers: { 'content-type': 'application/json', 'x-request-id': reqId } }
     );
   } catch (err: any) {
