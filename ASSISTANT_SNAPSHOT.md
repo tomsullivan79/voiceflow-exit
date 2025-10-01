@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: b7b1b20 — 19E-1: curated steps injection + curatedSource in debug; dynamic runLLM; normalization + enrichment retained
-- **Updated (America/Chicago)**: 2025-10-01 15:55 CT
+- **Latest commit**: b3d445e — restore referral.default.md for curated referral tests
+- **Updated (America/Chicago)**: 2025-10-01 16:18 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -112,7 +112,6 @@ public/
 db/
   CHANGES/
     .gitkeep
-    2025-09-28__example.sql
     2025-09-30_public-health-contacts.sql
     README.md
   SCHEMA.md
@@ -138,6 +137,7 @@ content/
     patient_status/
     triage/
     README.md
+cookiejar.txt
 data/
   raw/
     species-meta-lookup.yaml
@@ -158,8 +158,10 @@ scripts/
   update-assistant-snapshot.mjs
   vercel-ignore.sh
 tsconfig.json
+tsconfig.tsbuildinfo
 types/
   species.ts
+  variableBus.smoke.ts
   variableBus.ts
 ```
 
