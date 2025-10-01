@@ -1,3 +1,4 @@
+// app/api/agent/llm/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { enrichDispatchSteps } from '@/lib/tools/enrichDispatchSteps';
 import { runOptionA } from '@/lib/agent/runOptionA';
@@ -10,7 +11,7 @@ function makeReqId() {
   return globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
 }
 
-// Resolve runLLM no matter how it's exported (named or default)
+// Resolve runLLM regardless of export shape (named or default)
 async function getRunLLM(): Promise<(bus: any) => Promise<{ blocks: any[]; updatedBus?: any }>> {
   const mod: any = await import('@/lib/agent/runLLM');
   const fn = mod?.runLLM ?? mod?.default;
@@ -18,7 +19,7 @@ async function getRunLLM(): Promise<(bus: any) => Promise<{ blocks: any[]; updat
   return fn;
 }
 
-// Titles + referral.validated
+// Titles + referral.validated normalization for blocks
 function normalizeBlocks(blocks: any[] = [], decision?: string) {
   for (const b of blocks) {
     if (b?.type === 'summary') b.title = 'Triage Summary';
@@ -36,7 +37,7 @@ function hasApiKey() {
   return !!process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'undefined';
 }
 
-// Merge base bus + updatedBus for enrichment context
+// Merge base bus + updatedBus so enrichment/curation have full context
 function mergeForEnrich(base: any, patch: any) {
   if (!patch) return base;
   return {
@@ -74,8 +75,8 @@ export async function POST(req: NextRequest) {
   const reqId = makeReqId();
   try {
     const { searchParams } = new URL(req.url);
-    const force = searchParams.get('force');                 // 'false' => deterministic
-    const debug = searchParams.get('debug') === '1';         // surface error details if LLM fails
+    const force = searchParams.get('force');          // 'false' => deterministic
+    const debug = searchParams.get('debug') === '1';  // include llm_error_detail / curatedSource
     const useLLM = !(force === 'false') && hasApiKey();
 
     const { bus } = (await req.json()) as { bus: any };
@@ -113,17 +114,19 @@ export async function POST(req: NextRequest) {
       result = await runOptionA(bus);
     }
 
-    // Standard title/validated normalization
+    // Normalize block titles/referral.validated
     const decision: string | undefined = result?.updatedBus?.triage?.decision;
     result.blocks = normalizeBlocks(result.blocks, decision);
 
-    // Shape normalization (caution_required, referral URL dedupe)
+    // Normalize shapes in updatedBus + referral URLs/titles
     result = normalizeResult(result, bus);
 
-    // ---- NEW: inject curated steps, if available ----
+    // Curated steps injection (Markdown → steps.lines), track source for debug
     const mergedBusForContent = mergeForEnrich(bus, result.updatedBus);
     const curated = await loadCuratedSteps(mergedBusForContent);
+    let curatedSource: string | null = null;
     if (curated) {
+      curatedSource = curated.source;
       let steps = result.blocks.find((b) => b?.type === 'steps');
       if (!steps) {
         steps = {
@@ -137,13 +140,18 @@ export async function POST(req: NextRequest) {
       if (curated.title) steps.title = curated.title;
     }
 
-    // Keep existing public-health contact enrichment last (so it appends neatly)
+    // Public-health contact enrichment last (appends neatly)
     result.blocks = await enrichDispatchSteps(result.blocks, mergedBusForContent);
 
-    return new NextResponse(
-      JSON.stringify({ ok: true, usedLLM, fallback, result, ...(llm_error_detail ? { llm_error_detail } : {}) }),
-      { status: 200, headers: { 'content-type': 'application/json', 'x-request-id': reqId } }
-    );
+    // Build response; expose curatedSource only when debug=1
+    const payload: any = { ok: true, usedLLM, fallback, result };
+    if (llm_error_detail) payload.llm_error_detail = llm_error_detail;
+    if (debug) payload.curatedSource = curatedSource;
+
+    return new NextResponse(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'content-type': 'application/json', 'x-request-id': reqId },
+    });
   } catch (err: any) {
     const error = err?.message ?? 'Server error';
     return new NextResponse(JSON.stringify({ ok: false, error }), {
