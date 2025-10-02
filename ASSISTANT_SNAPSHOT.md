@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 3511943 — 19E-QA: node:test coverage for placeholders, county suffix stripping, and HTML comment sanitization
-- **Updated (America/Chicago)**: 2025-10-02 14:41 CT
+- **Latest commit**: 2fda903 — 20A: add agent instructions resolver + route wiring; surface agentInstructionsSource and store text in result.meta.agent_instructions
+- **Updated (America/Chicago)**: 2025-10-02 14:50 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -91,6 +91,7 @@ lib/
   data/
     speciesGroups.ts
   tools/
+    agentInstructions.ts
     curatedInstructions.ts
     enrichDispatchSteps.ts
     instructionsFetch.ts
@@ -136,6 +137,7 @@ README.md
 White_Sage.png
 content/
   instructions/
+    agent/
     patient_status/
     referral/
     triage/
