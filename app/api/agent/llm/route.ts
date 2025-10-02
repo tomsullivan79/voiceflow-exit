@@ -13,10 +13,6 @@ async function loadDeterministicRunner(): Promise<Runner> {
   return fn as Runner;
 }
 
-// (keep your normalizeBus, markdownToSteps, injectCuratedSteps helpers if you already have them)
-// Below assumes they exist exactly as in your current route.
-// If not present, paste your existing implementations back in.
-
 function markdownToSteps(md: string): { title: string; lines: string[] } {
   const lines = md.split(/\r?\n/);
   let title = "Do this next";
@@ -78,27 +74,34 @@ export async function POST(req: NextRequest) {
     const bus = normalizeBus(body?.bus);
     const hasKey = !!process.env.OPENAI_API_KEY;
 
-    // Load agent instructions (NEW) and curated steps (existing)
+    // Load agent (NEW) + curated (existing)
     const [agent, curated] = await Promise.all([
       getAgentInstructions(bus),
       getCuratedInstructions(bus),
     ]);
 
+    // Parity: Option A remains baseline; still call the deterministic runner.
     const useDeterministic = force === "false" || !hasKey;
     const runDeterministic = await loadDeterministicRunner();
-    const result = await runDeterministic(bus, { curated });
+
+    // Pass both curated and agent to the runner for future use (no breaking changes).
+    const result = await runDeterministic(bus, { curated, agent });
 
     // Inject curated steps as before
     if (curated?.content) injectCuratedSteps(result, curated.content);
 
-    // Attach agent instructions to meta (traceable, parity-safe)
+    // Attach agent instructions to meta (traceable)
     (result.meta ??= {});
     result.meta.agent_instructions = agent?.content ?? null;
+
+    // If an LLM client consumes this API, provide a ready-to-use preface.
+    const llm_preface = agent?.content || null;
 
     const payload: any = {
       ok: true,
       usedLLM: !useDeterministic && hasKey ? true : false,
       result,
+      llm_preface, // <-- clients can prepend this when usedLLM:true
     };
 
     if (debug) {
