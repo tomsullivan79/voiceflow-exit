@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: d7a9c2f — 20F: seed agent default.supportive docs for triage/referral/patient_status
-- **Updated (America/Chicago)**: 2025-10-02 15:22 CT
+- **Latest commit**: 8a8cf16 — 20G: /dev/chat adds tone/playbook controls and previews for agent instructions + curated source
+- **Updated (America/Chicago)**: 2025-10-02 15:29 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
