@@ -1,6 +1,6 @@
 // lib/tools/curatedInstructions.ts
 // Loads curated instruction markdown from /content/instructions/** with robust path resolution
-// for Vercel/Next packaging. Returns { title?, lines[], source } or null.
+// and supports simple {{placeholders}} replaced from the Bus.
 
 import { readFile, access } from 'node:fs/promises';
 import path from 'node:path';
@@ -29,7 +29,7 @@ async function resolveContentRoot(): Promise<string> {
     path.join(cwd, '.next', 'server', 'content', 'instructions'),
     // Standalone/monorepo-ish
     path.join(cwd, '..', 'content', 'instructions'),
-    // Resolve relative to compiled file location
+    // Relative to compiled file location
     path.join(here, '..', '..', '..', 'content', 'instructions'),
     path.join(here, '..', '..', '..', '..', 'content', 'instructions'),
   ];
@@ -120,4 +120,60 @@ export async function loadCuratedSteps(bus: any): Promise<CuratedSteps | null> {
     }
   }
   return null;
+}
+
+// -------------------- Placeholders --------------------
+
+function getByPath(obj: any, pathStr: string): any {
+  if (!obj || !pathStr) return undefined;
+  return pathStr.split('.').reduce((acc: any, key: string) => (acc == null ? acc : acc[key]), obj);
+}
+
+/**
+ * Replace {{placeholders}} in provided lines with values from the Bus.
+ * Supported friendly keys:
+ *   {{zip}}            -> caller.zip
+ *   {{county}}         -> caller.county
+ *   {{species}}        -> animal.species_text (falls back to species_slug)
+ *   {{species_slug}}   -> animal.species_slug
+ *   {{decision}}       -> triage.decision
+ *   {{urgency}}        -> triage.urgency
+ *   {{org_site}}       -> org.site_code
+ *   {{org_timezone}}   -> org.timezone
+ *
+ * Also supports dotted paths directly, e.g. {{caller.zip}}, {{org.site_code}}.
+ * Missing values are left as-is (the {{token}} remains), so authors notice.
+ */
+export function applyCuratedPlaceholders(lines: string[], bus: any): string[] {
+  const map: Record<string, string> = {
+    zip: 'caller.zip',
+    county: 'caller.county',
+    species: 'animal.species_text',
+    species_slug: 'animal.species_slug',
+    decision: 'triage.decision',
+    urgency: 'triage.urgency',
+    org_site: 'org.site_code',
+    org_timezone: 'org.timezone',
+  };
+
+  const speciesText = getByPath(bus, 'animal.species_text') || getByPath(bus, 'animal.species_slug');
+  const cache: Record<string, string | undefined> = {
+    species: speciesText,
+  };
+
+  const re = /\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g;
+
+  return (lines || []).map((line) =>
+    line.replace(re, (_m, key: string) => {
+      // Try friendly map first
+      const pathStr = map[key] || key; // allow dotted paths directly
+      const cached = cache[key];
+      if (cached !== undefined) return String(cached);
+      const val = getByPath(bus, pathStr);
+      if (val === undefined || val === null) return `{{${key}}}`; // leave token
+      const s = String(val);
+      cache[key] = s;
+      return s;
+    })
+  );
 }

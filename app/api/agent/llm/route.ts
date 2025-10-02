@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { enrichDispatchSteps } from '@/lib/tools/enrichDispatchSteps';
 import { runOptionA } from '@/lib/agent/runOptionA';
 import { normalizeResult } from '@/lib/agent/normalizeResult';
-import { loadCuratedSteps } from '@/lib/tools/curatedInstructions';
+import { loadCuratedSteps, applyCuratedPlaceholders } from '@/lib/tools/curatedInstructions';
 
 export const runtime = 'nodejs';
 
@@ -136,7 +136,9 @@ export async function POST(req: NextRequest) {
         };
         result.blocks.push(steps);
       }
-      steps.lines = Array.isArray(steps.lines) ? curated.lines.slice() : curated.lines.slice();
+      // Apply placeholders to curated lines
+      const filled = applyCuratedPlaceholders(curated.lines, mergedBusForContent);
+      steps.lines = Array.isArray(steps.lines) ? filled : filled;
       if (curated.title) steps.title = curated.title;
     }
 

@@ -6,3 +6,4 @@
 - Call your local Public Health Department or Animal Control for testing and exposure guidance.
 - If anyone had direct contact (bite/scratch): wash with soap and water for 15 minutes and seek medical care immediately.
 - If advised to submit the bat for testing, follow their instructions for safe capture/transport—do not handle without guidance.
+- **Incident location:** ZIP {{zip}} ({{county}} County).   <!-- placeholders demo -->
