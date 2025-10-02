@@ -1,3 +1,4 @@
+// app/api/agent/llm/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { getCuratedInstructions } from "@/lib/tools/curatedInstructions";
@@ -5,6 +6,7 @@ import { getAgentInstructions } from "@/lib/tools/agentInstructions";
 
 export const dynamic = "force-dynamic";
 
+// Tolerant dynamic import: accept runDeterministic, runLLM, or default export.
 type Runner = (bus: any, extras?: any) => Promise<any> | any;
 async function loadDeterministicRunner(): Promise<Runner> {
   const mod: any = await import("@/lib/agent/runLLM");
@@ -13,35 +15,7 @@ async function loadDeterministicRunner(): Promise<Runner> {
   return fn as Runner;
 }
 
-function markdownToSteps(md: string): { title: string; lines: string[] } {
-  const lines = md.split(/\r?\n/);
-  let title = "Do this next";
-  const out: string[] = [];
-  for (const raw0 of lines) {
-    const raw = raw0.trim();
-    if (!raw) continue;
-    const h = raw.match(/^#{1,6}\s*(.+)$/);
-    if (h && title === "Do this next") { title = h[1].trim(); continue; }
-    const list = raw.replace(/^\s*([-*]|\d+[\.\)])\s+/, "").trim();
-    const text = list.replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1");
-    if (text) out.push(text);
-  }
-  return { title, lines: out.length ? out : lines.filter(Boolean) };
-}
-
-function injectCuratedSteps(result: any, curatedMd: string) {
-  if (!result || !Array.isArray(result.blocks)) return;
-  const { title, lines } = markdownToSteps(curatedMd);
-  if (!lines.length) return;
-  const blocks = result.blocks as Array<any>;
-  const idxSteps = blocks.findIndex((b) => b?.type === "steps");
-  const idxReferral = blocks.findIndex((b) => b?.type === "referral");
-  const newSteps = { type: "steps", title, lines };
-  if (idxSteps >= 0) blocks[idxSteps] = newSteps;
-  else if (idxReferral >= 0) blocks.splice(idxReferral, 0, newSteps);
-  else blocks.unshift(newSteps);
-}
-
+/** Defensive defaults so downstream logic never crashes on missing fields. */
 function normalizeBus(raw: any) {
   const bus = raw && typeof raw === "object" ? raw : {};
   bus.mode = bus.mode || "triage";
@@ -52,11 +26,65 @@ function normalizeBus(raw: any) {
   bus.org = bus.org || {};
   bus.system = bus.system || {};
   bus.species_flags = {
-    dangerous: false, rabies_vector: false, referral_required: false,
-    intervention_needed: false, after_hours_allowed: false,
-    ...(bus.species_flags || {})
+    dangerous: false,
+    rabies_vector: false,
+    referral_required: false,
+    intervention_needed: false,
+    after_hours_allowed: false,
+    ...(bus.species_flags || {}),
   };
   return bus;
+}
+
+/** Convert simple Markdown into a steps block structure. */
+function markdownToSteps(md: string): { title: string; lines: string[] } {
+  const lines = md.split(/\r?\n/);
+  let title = "Do this next";
+  const out: string[] = [];
+
+  for (const raw0 of lines) {
+    const raw = raw0.trim();
+    if (!raw) continue;
+
+    // First heading becomes title
+    const h = raw.match(/^#{1,6}\s*(.+)$/);
+    if (h && title === "Do this next") {
+      title = h[1].trim();
+      continue;
+    }
+
+    // Strip list markers: -, *, 1), 1., etc.
+    const list = raw.replace(/^\s*([-*]|\d+[\.\)])\s+/, "").trim();
+    // Strip leftover markdown emphasis markers
+    const text = list.replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1");
+
+    if (text) out.push(text);
+  }
+
+  // Fallback: if we only had paragraphs (no lists), keep them as individual lines
+  return { title, lines: out.length ? out : lines.filter(Boolean) };
+}
+
+/** Inject/replace a steps block in `result.blocks` with curated Markdown. */
+function injectCuratedSteps(result: any, curatedMd: string) {
+  if (!result || !Array.isArray(result.blocks)) return;
+
+  const { title, lines } = markdownToSteps(curatedMd);
+  if (!lines.length) return;
+
+  const blocks = result.blocks as Array<any>;
+  const idxSteps = blocks.findIndex((b) => b?.type === "steps");
+  const idxReferral = blocks.findIndex((b) => b?.type === "referral");
+
+  const newSteps = { type: "steps", title, lines };
+
+  if (idxSteps >= 0) {
+    blocks[idxSteps] = newSteps;
+  } else if (idxReferral >= 0) {
+    blocks.splice(idxReferral, 0, newSteps);
+  } else {
+    blocks.unshift(newSteps);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -64,56 +92,70 @@ export async function POST(req: NextRequest) {
     const url = new URL(req.url);
     const debug = url.searchParams.get("debug") === "1";
     const ping = url.searchParams.get("ping") === "1";
-    const force = url.searchParams.get("force");
+    const force = url.searchParams.get("force"); // "false" => deterministic
     const hdrs = headers();
     const xreq = hdrs.get("x-request-id") || undefined;
 
-    if (ping) return NextResponse.json({ ok: true, ping: "pong", x_request_id: xreq });
+    if (ping) {
+      return NextResponse.json({ ok: true, ping: "pong", x_request_id: xreq });
+    }
 
     const body = await req.json();
     const bus = normalizeBus(body?.bus);
     const hasKey = !!process.env.OPENAI_API_KEY;
 
-    // Load agent (NEW) + curated (existing)
+    // Load agent instructions and curated steps (both may be cached by their modules)
     const [agent, curated] = await Promise.all([
-      getAgentInstructions(bus),
-      getCuratedInstructions(bus),
+      getAgentInstructions(bus),     // returns { content, sourcePath, placeholderApplied, cacheHit? }
+      getCuratedInstructions(bus),   // returns { content, sourcePath, placeholderApplied, cacheHit? }
     ]);
 
-    // Parity: Option A remains baseline; still call the deterministic runner.
+    // Parity: Option A (deterministic) is baseline for decision/severity.
     const useDeterministic = force === "false" || !hasKey;
     const runDeterministic = await loadDeterministicRunner();
 
-    // Pass both curated and agent to the runner for future use (no breaking changes).
+    // Pass both curated and agent to the runner for future use (non-breaking).
     const result = await runDeterministic(bus, { curated, agent });
 
-    // Inject curated steps as before
-    if (curated?.content) injectCuratedSteps(result, curated.content);
+    // Route-level merge: if curated Markdown exists, inject into steps.
+    if (curated?.content) {
+      injectCuratedSteps(result, curated.content);
+    }
 
     // Attach agent instructions to meta (traceable)
     (result.meta ??= {});
     result.meta.agent_instructions = agent?.content ?? null;
 
-    // If an LLM client consumes this API, provide a ready-to-use preface.
+    // Provide a ready-to-use preface for LLM clients (parity-safe)
     const llm_preface = agent?.content || null;
 
     const payload: any = {
       ok: true,
       usedLLM: !useDeterministic && hasKey ? true : false,
       result,
-      llm_preface, // <-- clients can prepend this when usedLLM:true
+      llm_preface,
     };
 
     if (debug) {
+      // Curated debug
       payload.curatedSource = curated.sourcePath;
       payload.placeholderApplied = curated.placeholderApplied;
+      payload.curatedCacheHit = curated.cacheHit;
+
+      // Agent debug
       payload.agentInstructionsSource = agent.sourcePath;
       payload.agentPlaceholderApplied = agent.placeholderApplied;
+      payload.agentCacheHit = agent.cacheHit;
+
+      // Request diagnostic
       payload.x_request_id = xreq;
     }
 
     return NextResponse.json(payload);
   } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err?.message || "unknown_error" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: err?.message || "unknown_error" },
+      { status: 500 }
+    );
   }
 }
