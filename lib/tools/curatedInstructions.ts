@@ -1,11 +1,14 @@
 // lib/tools/curatedInstructions.ts
 // Loads curated instruction markdown from /content/instructions/** with robust path resolution
-// and supports simple {{placeholders}} replaced from the Bus.
+// (so it works on Vercel/Next) and supports simple {{placeholders}} replaced from the Bus,
+// including {{county_name}} which strips suffixes like "County", "Parish", "Borough", etc.
 
 import { readFile, access } from 'node:fs/promises';
 import path from 'node:path';
 
 export type CuratedSteps = { title?: string; lines: string[]; source: string };
+
+// ---------- FS helpers ----------
 
 async function exists(p: string) {
   try {
@@ -16,7 +19,10 @@ async function exists(p: string) {
   }
 }
 
-// Try multiple candidate locations that can occur in Next/Vercel builds.
+/**
+ * Try multiple candidate locations for the content folder that can occur in Next/Vercel builds.
+ * Falls back to project root expectation if nothing is found.
+ */
 async function resolveContentRoot(): Promise<string> {
   const cwd = process.cwd();
   const here = typeof __dirname === 'string' ? __dirname : cwd;
@@ -41,11 +47,14 @@ async function resolveContentRoot(): Promise<string> {
   return path.join(cwd, 'content', 'instructions');
 }
 
+// ---------- Markdown parsing ----------
+
 function parseMarkdown(md: string): { title?: string; lines: string[] } {
   const rows = md.split(/\r?\n/);
   let title: string | undefined;
   let i = 0;
 
+  // Optional H1 title on the first line becomes the steps block title
   if (rows[0]?.trim().startsWith('#')) {
     title = rows[0].replace(/^#\s*/, '').trim();
     i = 1;
@@ -72,6 +81,7 @@ function parseMarkdown(md: string): { title?: string; lines: string[] } {
       flush();
       out.push(m[1].trim());
     } else {
+      // Non-bulleted text lines get merged into a paragraph
       para.push(line.trim());
     }
   }
@@ -79,14 +89,21 @@ function parseMarkdown(md: string): { title?: string; lines: string[] } {
   return { title, lines: out };
 }
 
+// ---------- Curated file selection ----------
+
 /**
- * Looks for a curated doc based on the bus.
- * Priority (for mode='triage'):
+ * Select a curated doc based on the Bus.
+ *
+ * For mode='triage':
  *   1) triage/<decision>.<species_slug>.md
  *   2) triage/<decision>.default.md
- * For other modes:
- *   patient_status/default.md
- *   referral/<species_slug>.md, referral/default.md
+ *
+ * For mode='patient_status':
+ *   - patient_status/default.md
+ *
+ * For mode='referral':
+ *   1) referral/<species_slug>.md
+ *   2) referral/default.md
  */
 export async function loadCuratedSteps(bus: any): Promise<CuratedSteps | null> {
   const mode = bus?.mode ?? 'triage';
@@ -116,38 +133,53 @@ export async function loadCuratedSteps(bus: any): Promise<CuratedSteps | null> {
         return { ...parsed, source: `${mode}/${name}` };
       }
     } catch {
-      // continue
+      // keep trying other candidates
     }
   }
   return null;
 }
 
-// -------------------- Placeholders --------------------
+// ---------- Placeholder replacement ----------
 
 function getByPath(obj: any, pathStr: string): any {
   if (!obj || !pathStr) return undefined;
   return pathStr.split('.').reduce((acc: any, key: string) => (acc == null ? acc : acc[key]), obj);
 }
 
+/** Strip common county-like suffixes once, case-insensitive. */
+function countyName(raw?: string): string | undefined {
+  if (!raw) return raw;
+  const suffixes = [' County', ' Parish', ' Borough', ' Census Area', ' Municipality'];
+  let out = String(raw);
+  for (const s of suffixes) {
+    const re = new RegExp(`${s}$`, 'i');
+    out = out.replace(re, '');
+  }
+  return out.trim();
+}
+
 /**
  * Replace {{placeholders}} in provided lines with values from the Bus.
- * Supported friendly keys:
+ *
+ * Friendly keys:
  *   {{zip}}            -> caller.zip
- *   {{county}}         -> caller.county
- *   {{species}}        -> animal.species_text (falls back to species_slug)
+ *   {{county}}         -> caller.county         (verbatim, e.g., "Hennepin County")
+ *   {{county_name}}    -> caller.county         (suffix-stripped, e.g., "Hennepin")
+ *   {{species}}        -> animal.species_text (fallback to species_slug)
  *   {{species_slug}}   -> animal.species_slug
  *   {{decision}}       -> triage.decision
  *   {{urgency}}        -> triage.urgency
  *   {{org_site}}       -> org.site_code
  *   {{org_timezone}}   -> org.timezone
  *
- * Also supports dotted paths directly, e.g. {{caller.zip}}, {{org.site_code}}.
- * Missing values are left as-is (the {{token}} remains), so authors notice.
+ * Also supports dotted paths directly, e.g., {{caller.zip}}, {{org.site_code}}.
+ * Missing values are left as-is (the {{token}} remains) so authors can notice.
  */
 export function applyCuratedPlaceholders(lines: string[], bus: any): string[] {
   const map: Record<string, string> = {
     zip: 'caller.zip',
     county: 'caller.county',
+    county_name: 'caller.county',
     species: 'animal.species_text',
     species_slug: 'animal.species_slug',
     decision: 'triage.decision',
@@ -156,24 +188,33 @@ export function applyCuratedPlaceholders(lines: string[], bus: any): string[] {
     org_timezone: 'org.timezone',
   };
 
-  const speciesText = getByPath(bus, 'animal.species_text') || getByPath(bus, 'animal.species_slug');
+  const speciesText =
+    getByPath(bus, 'animal.species_text') || getByPath(bus, 'animal.species_slug');
+
+  // small cache for values that need pre-processing
   const cache: Record<string, string | undefined> = {
     species: speciesText,
+    county_name: countyName(getByPath(bus, 'caller.county')),
   };
 
   const re = /\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g;
 
   return (lines || []).map((line) =>
     line.replace(re, (_m, key: string) => {
-      // Try friendly map first
-      const pathStr = map[key] || key; // allow dotted paths directly
-      const cached = cache[key];
-      if (cached !== undefined) return String(cached);
-      const val = getByPath(bus, pathStr);
-      if (val === undefined || val === null) return `{{${key}}}`; // leave token
-      const s = String(val);
+      // Try friendly key → path map first; allow dotted paths directly as a fallback
+      const pathStr = map[key] || key;
+
+      // Cached/precomputed value?
+      if (cache[key] !== undefined) return String(cache[key]);
+
+      // Pull value by path
+      const raw = getByPath(bus, pathStr);
+      if (raw === undefined || raw === null) return `{{${key}}}`;
+
+      // Compute & cache on first sight
+      const s = key === 'county_name' ? countyName(String(raw)) : String(raw);
       cache[key] = s;
-      return s;
+      return s ?? `{{${key}}}`;
     })
   );
 }
