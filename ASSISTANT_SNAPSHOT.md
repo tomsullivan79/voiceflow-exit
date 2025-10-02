@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: c95777c — 19E-3: referral-mode curated Markdown (default + supportive) and tests
-- **Updated (America/Chicago)**: 2025-10-02 11:37 CT
+- **Latest commit**: c43bb67 — 19E-3: normalize Bus defaults in route (species_flags, triage) to prevent undefined errors
+- **Updated (America/Chicago)**: 2025-10-02 11:57 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
