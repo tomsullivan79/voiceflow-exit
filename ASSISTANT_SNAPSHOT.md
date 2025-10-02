@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: eed6ff4 — 19E-4: add species group resolver (raptor, corvid); selection order species.tone→group.tone→default.tone→species→group→default; add sample raptor supportive files
-- **Updated (America/Chicago)**: 2025-10-02 13:29 CT
+- **Latest commit**: efa8ec8 — 19E-4: referral-mode resolver prefers top-level group files (referral/<group>.<tone>.md) before default.*
+- **Updated (America/Chicago)**: 2025-10-02 14:25 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
