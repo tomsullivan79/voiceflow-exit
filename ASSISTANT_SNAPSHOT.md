@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: e3aaf91 — 19E-2C: Tone overlays for curated Markdown (supportive); resolution order: species.tone → default.tone → species → default; surfaces curatedSource + placeholderApplied in debug
-- **Updated (America/Chicago)**: 2025-10-02 10:50 CT
+- **Latest commit**: 354b4f4 — 19E-2C: robust dynamic import in /api/agent/llm and supportive tone overlay file
+- **Updated (America/Chicago)**: 2025-10-02 11:04 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
