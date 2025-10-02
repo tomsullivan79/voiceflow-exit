@@ -1,419 +1,176 @@
-'use client';
+// app/dev/chat/page.tsx
+"use client";
+import React from "react";
 
-import React, { useEffect, useMemo, useState } from 'react';
-
-type WTResponse = {
-  ok?: boolean;
+type ApiResult = {
+  ok: boolean;
   usedLLM?: boolean;
-  fallback?: string | null;
-  result?: {
-    blocks?: any[];
-    updatedBus?: any;
-  };
-  error?: string;
+  result?: any;
+  llm_preface?: string | null;
+  curatedSource?: string | null;
+  placeholderApplied?: boolean;
+  agentInstructionsSource?: string | null;
+  agentPlaceholderApplied?: boolean;
+  x_request_id?: string | null;
 };
 
-const PRESETS: Record<string, any> = {
-  osprey_referral: {
-    mode: 'triage',
-    caller: { roles: [], zip: '55414', county: 'Hennepin County' },
-    preferences: {},
-    consent: {},
-    animal: { species_slug: 'osprey', species_text: 'Osprey' },
-    species_flags: {
-      dangerous: true,
-      rabies_vector: false,
-      referral_required: true,
-      intervention_needed: true,
-      after_hours_allowed: false
-    },
-    triage: {},
-    conversation: {},
-    org: { site_code: 'WRCMN', timezone: 'America/Chicago', after_hours: false },
-    system: { channel: 'web', system_time: '2025-01-01T00:00:00Z' }
-  },
-  bat_dispatch: {
-    mode: 'triage',
-    caller: { roles: [], zip: '55414', county: 'Hennepin County' },
-    preferences: {},
-    consent: {},
-    animal: { species_slug: 'big-brown-bat', species_text: 'Big Brown Bat', contained: false },
-    exposure: { bat_sleeping_area: true },
-    species_flags: {
-      dangerous: false,
-      rabies_vector: true,
-      referral_required: false,
-      intervention_needed: false,
-      after_hours_allowed: false
-    },
-    triage: {},
-    conversation: {},
-    org: { site_code: 'WRCMN', timezone: 'America/Chicago', after_hours: false },
-    system: { channel: 'web', system_time: '2025-01-01T00:00:00Z' }
-  },
-  raccoon_afterhours_deflect: {
-    mode: 'triage',
-    caller: { roles: [], zip: '55414', county: 'Hennepin County' },
-    preferences: {},
-    consent: {},
-    animal: { species_slug: 'raccoon', species_text: 'Raccoon', observed_condition: 'injured', contained: false },
-    species_flags: {
-      dangerous: false,
-      rabies_vector: true,
-      referral_required: false,
-      intervention_needed: false,
-      after_hours_allowed: false
-    },
-    triage: {},
-    conversation: {},
-    org: { site_code: 'WRCMN', timezone: 'America/Chicago', after_hours: true, after_hours_rule: 'deflect' },
-    system: { channel: 'web', system_time: '2025-01-01T00:00:00Z' }
-  }
-};
+export default function DevChat() {
+  const [tone, setTone] = React.useState<"" | "supportive">("");
+  const [playbook, setPlaybook] = React.useState<"" | "onsite_help" | "after_hours_support">("");
+  const [mode, setMode] = React.useState<"triage" | "referral" | "patient_status">("triage");
+  const [species, setSpecies] = React.useState("american-crow"); // quick default for corvid tests
+  const [decision, setDecision] = React.useState<"" | "referral" | "dispatch">("referral");
+  const [resp, setResp] = React.useState<ApiResult | null>(null);
+  const [loading, setLoading] = React.useState(false);
 
-const DEFAULT_BUS = JSON.stringify(PRESETS.osprey_referral, null, 2);
-
-// --- tiny diff helper (limited to triage/referral) ---
-function flatten(obj: any, prefix = ''): Record<string, any> {
-  const out: Record<string, any> = {};
-  if (obj && typeof obj === 'object') {
-    for (const k of Object.keys(obj)) {
-      const v = obj[k];
-      const path = prefix ? `${prefix}.${k}` : k;
-      if (v && typeof v === 'object' && !Array.isArray(v)) Object.assign(out, flatten(v, path));
-      else out[path] = v;
-    }
-  }
-  return out;
-}
-function sectionDiff(before: any, after: any) {
-  const a = flatten(before || {});
-  const b = flatten(after || {});
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  const changes: Array<{ path: string; from: any; to: any }> = [];
-  for (const k of keys) {
-    const same = JSON.stringify(a[k]) === JSON.stringify(b[k]);
-    if (!same) changes.push({ path: k, from: a[k], to: b[k] });
-  }
-  return changes;
-}
-
-// shell-escape for single-quoted strings: abc'def -> 'abc'"'"'def'
-function shSingleQuote(s: string) {
-  return `'${s.replace(/'/g, `'\"'\"'`)}'`;
-}
-
-export default function DevChatPage() {
-  const [jsonText, setJsonText] = useState<string>(DEFAULT_BUS);
-  const [useLLM, setUseLLM] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<WTResponse | null>(null);
-  const [requestId, setRequestId] = useState<string | null>(null);
-  const [lastSentBus, setLastSentBus] = useState<any | null>(null);
-  const [presetSel, setPresetSel] = useState<string>('osprey_referral');
-  const [copiedCurl, setCopiedCurl] = useState<boolean>(false);
-
-  // Optional: ?preset=bat_dispatch
-  useEffect(() => {
-    const sp = new URLSearchParams(window.location.search);
-    const p = sp.get('preset');
-    if (p && PRESETS[p]) {
-      setPresetSel(p);
-      setJsonText(JSON.stringify(PRESETS[p], null, 2));
-    }
-  }, []);
-
-  const endpoint = useMemo(() => (useLLM ? '/api/agent/llm' : '/api/agent/llm?force=false'), [useLLM]);
-
-  function FallbackBadge({ type }: { type?: string | null }) {
-    if (!type) return null;
-    const tone =
-      type === 'llm_guardrail'
-        ? { bg: '#fef3c7', color: '#92400e', label: 'Guardrail' }
-        : type === 'llm_timeout'
-        ? { bg: '#fee2e2', color: '#7f1d1d', label: 'Timeout' }
-        : { bg: '#e5e7eb', color: '#111827', label: type };
-    return (
-      <span className="chip" style={{ background: tone.bg, color: tone.color }}>
-        fallback: {tone.label}
-      </span>
-    );
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setData(null);
-    setRequestId(null);
-
-    let parsed: any;
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch {
-      setError('Invalid JSON in Bus textarea. Please fix and try again.');
-      return;
-    }
-    setLastSentBus(parsed);
-
+  async function run(forceDeterministic: boolean) {
     setLoading(true);
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ bus: parsed })
+      const body = {
+        bus: {
+          mode,
+          overlays: {
+            tone_overlay: tone || undefined,
+            playbook: playbook || undefined,
+          },
+          triage: decision ? { decision } : {},
+          caller: { zip: "55414", county: "Hennepin County" },
+          animal: { species_slug: species, species_text: species.replace(/-/g, " ") },
+          org: { site_code: "WRCMN", timezone: "America/Chicago", after_hours: playbook === "after_hours_support" },
+          system: { channel: "web", system_time: new Date().toISOString() },
+        },
+      };
+      const qs = new URLSearchParams();
+      if (forceDeterministic) qs.set("force", "false");
+      qs.set("debug", "1");
+      const r = await fetch(`/api/agent/llm?${qs.toString()}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
       });
-      const reqId = res.headers.get('x-request-id');
-      if (reqId) setRequestId(reqId);
-      const body = (await res.json()) as WTResponse;
-      if (!res.ok || body?.ok === false) setError(body?.error || `Request failed with status ${res.status}`);
-      setData(body);
-    } catch (err: any) {
-      setError(err?.message || 'Network error');
+      const j = (await r.json()) as ApiResult;
+      setResp(j);
+    } catch (e) {
+      setResp({ ok: false } as any);
     } finally {
       setLoading(false);
     }
   }
 
-  function handleLoadPreset() {
-    const obj = PRESETS[presetSel] ?? PRESETS.osprey_referral;
-    setJsonText(JSON.stringify(obj, null, 2));
+  function reset() {
+    setTone("");
+    setPlaybook("");
+    setMode("triage");
+    setSpecies("american-crow");
+    setDecision("referral");
+    setResp(null);
   }
-
-  function handleResetToPreset() {
-    const obj = PRESETS[presetSel] ?? PRESETS.osprey_referral;
-    setError(null);
-    setData(null);
-    setRequestId(null);
-    setLastSentBus(null);
-    setJsonText(JSON.stringify(obj, null, 2));
-  }
-
-  async function handleCopyCurl() {
-    setError(null);
-    try {
-      // Prefer current textarea; fall back to last sent bus if textarea is broken
-      let payloadText = '';
-      try {
-        const parsed = JSON.parse(jsonText);
-        payloadText = JSON.stringify({ bus: parsed }, null, 2);
-      } catch {
-        if (lastSentBus) {
-          payloadText = JSON.stringify({ bus: lastSentBus }, null, 2);
-        } else {
-          throw new Error('Invalid JSON; fix the textarea or send once before copying cURL.');
-        }
-      }
-
-      const origin = window.location.origin.replace(/\/$/, '');
-      const url = `${origin}${endpoint}`;
-      const curl = [
-        `curl -iS -m 25 ${shSingleQuote(url)}`,
-        `  -H 'content-type: application/json'`,
-        `  --data ${shSingleQuote(payloadText)}`
-      ].join(' \\\n');
-
-      await navigator.clipboard.writeText(curl);
-      setCopiedCurl(true);
-      setTimeout(() => setCopiedCurl(false), 1500);
-    } catch (e: any) {
-      setError(e?.message || 'Failed to build cURL');
-    }
-  }
-
-  const diffs = useMemo(() => {
-    const before = lastSentBus || {};
-    const after = data?.result?.updatedBus || {};
-    const pick = (x: any) => ({ triage: x?.triage ?? {}, referral: x?.referral ?? {} });
-    return {
-      triage: sectionDiff(pick(before).triage, pick(after).triage),
-      referral: sectionDiff(pick(before).referral, pick(after).referral)
-    };
-  }, [lastSentBus, data]);
 
   return (
-    <div className="wrap">
-      <div className="card">
-        <h1>Dev · Minimal Chat UI</h1>
-        <p className="muted">Choose a preset or paste your own <code>bus</code>. Toggle deterministic vs LLM.</p>
+    <div className="p-6 space-y-4">
+      <h1 className="text-2xl font-semibold">/dev/chat — Agent + Curated Preview</h1>
 
-        {/* Presets */}
-        <div className="presets">
-          <label className="label">Presets</label>
-          <div className="row">
-            <select value={presetSel} onChange={(e) => setPresetSel(e.target.value)} className="select" aria-label="Presets">
-              <option value="osprey_referral">Osprey — referral</option>
-              <option value="bat_dispatch">Bat — dispatch (sleeping area, uncontained)</option>
-              <option value="raccoon_afterhours_deflect">Raccoon — after-hours deflect</option>
-            </select>
-            <div className="row" style={{ gap: 8 }}>
-              <button type="button" onClick={handleLoadPreset} className="button secondary">Load preset</button>
-              <button type="button" onClick={handleResetToPreset} className="button tertiary">Reset to preset</button>
-            </div>
-          </div>
-          <p className="muted small">Tip: add <code>?preset=bat_dispatch</code> to the URL to auto-load on refresh.</p>
+      {/* Controls */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Mode</label>
+          <select className="w-full border rounded p-2"
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value as any)}>
+            <option value="triage">triage</option>
+            <option value="referral">referral</option>
+            <option value="patient_status">patient_status</option>
+          </select>
         </div>
 
-        {/* Editor */}
-        <form onSubmit={handleSubmit} className="form">
-          <label className="label">
-            Bus JSON
-            <textarea
-              value={jsonText}
-              onChange={(e) => setJsonText(e.target.value)}
-              spellCheck={false}
-              rows={16}
-              className="textarea"
-              aria-label="Bus JSON"
-            />
-          </label>
-
-          <div className="row">
-            <label className="checkbox">
-              <input type="checkbox" checked={useLLM} onChange={(e) => setUseLLM(e.target.checked)} />
-              <span>Use LLM (unchecked = deterministic router)</span>
-            </label>
-
-            <div className="row" style={{ gap: 8 }}>
-              <button type="button" onClick={handleCopyCurl} className="button secondary">Copy as cURL</button>
-              <button type="submit" disabled={loading} className="button">{loading ? 'Sending…' : 'Send to /api/agent/llm'}</button>
-            </div>
-          </div>
-        </form>
-
-        <div className="badges">
-          {requestId && (<span className="chip chip-id">x-request-id: <code>{requestId}</code></span>)}
-          <FallbackBadge type={data?.fallback} />
-          {copiedCurl && (<span className="chip" style={{ background: '#e6f6ea', color: '#065f46' }}>Copied cURL ✓</span>)}
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Tone overlay</label>
+          <select className="w-full border rounded p-2"
+                  value={tone}
+                  onChange={(e) => setTone(e.target.value as any)}>
+            <option value="">(none)</option>
+            <option value="supportive">supportive</option>
+          </select>
         </div>
 
-        {error && <div className="error"><strong>Error:</strong> {error}</div>}
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Playbook</label>
+          <select className="w-full border rounded p-2"
+                  value={playbook}
+                  onChange={(e) => setPlaybook(e.target.value as any)}>
+            <option value="">(none)</option>
+            <option value="onsite_help">onsite_help</option>
+            <option value="after_hours_support">after_hours_support</option>
+          </select>
+        </div>
 
-        {data && (
-          <div className="result">
-            <h2>Result</h2>
-            <div className="kv">
-              <div><span className="k">ok</span><span className="v">{String(data.ok ?? '—')}</span></div>
-              <div><span className="k">usedLLM</span><span className="v">{String(data.usedLLM ?? '—')}</span></div>
-              <div><span className="k">fallback</span><span className="v">{String(data.fallback ?? '—')}</span></div>
-            </div>
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Species (slug)</label>
+          <input className="w-full border rounded p-2"
+                 value={species}
+                 onChange={(e) => setSpecies(e.target.value)} />
+        </div>
 
-            {/* Blocks */}
-            <section className="blocks">
-              <h3>blocks[]</h3>
-              {data?.result?.blocks?.length ? (
-                data.result.blocks.map((b: any, i: number) => (
-                  <div key={i} className="block">
-                    <div className="blockHead">
-                      <span className="chip">{b?.type ?? 'block'}</span>
-                      <strong>{b?.title ?? '(no title)'}</strong>
-                    </div>
-
-                    {typeof b?.text === 'string' && <p className="text">{b.text}</p>}
-
-                    {/* Render steps.lines and items */}
-                    {Array.isArray(b?.lines) && b.lines.length > 0 && (
-                      <ul className="list">
-                        {b.lines.map((it: any, j: number) => (
-                          <li key={j}>{typeof it === 'string' ? it : JSON.stringify(it)}</li>
-                        ))}
-                      </ul>
-                    )}
-                    {Array.isArray(b?.items) && b.items.length > 0 && (
-                      <ul className="list">
-                        {b.items.map((it: any, j: number) => (
-                          <li key={j}>{typeof it === 'string' ? it : JSON.stringify(it)}</li>
-                        ))}
-                      </ul>
-                    )}
-
-                    <details className="raw">
-                      <summary>Raw block</summary>
-                      <pre>{JSON.stringify(b, null, 2)}</pre>
-                    </details>
-                  </div>
-                ))
-              ) : (
-                <p className="muted">No blocks returned.</p>
-              )}
-            </section>
-
-            {/* updatedBus */}
-            <section className="updated">
-              <h3>updatedBus</h3>
-              {data?.result?.updatedBus ? (
-                <>
-                  <pre className="pre">{JSON.stringify(data.result.updatedBus, null, 2)}</pre>
-                  <div className="diffs">
-                    <h4>Diff — triage</h4>
-                    {diffs.triage.length ? (
-                      <ul className="list">
-                        {diffs.triage.map((d, i) => (
-                          <li key={i}><code>{d.path}</code>: <span className="del">{JSON.stringify(d.from)}</span> → <span className="ins">{JSON.stringify(d.to)}</span></li>
-                        ))}
-                      </ul>
-                    ) : (<p className="muted">No changes in triage.</p>)}
-
-                    <h4>Diff — referral</h4>
-                    {diffs.referral.length ? (
-                      <ul className="list">
-                        {diffs.referral.map((d, i) => (
-                          <li key={i}><code>{d.path}</code>: <span className="del">{JSON.stringify(d.from)}</span> → <span className="ins">{JSON.stringify(d.to)}</span></li>
-                        ))}
-                      </ul>
-                    ) : (<p className="muted">No changes in referral.</p>)}
-                  </div>
-                </>
-              ) : (
-                <p className="muted">No updatedBus in response.</p>
-              )}
-            </section>
-          </div>
-        )}
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Decision (triage)</label>
+          <select className="w-full border rounded p-2"
+                  value={decision}
+                  onChange={(e) => setDecision(e.target.value as any)}>
+            <option value="">(none)</option>
+            <option value="referral">referral</option>
+            <option value="dispatch">dispatch</option>
+          </select>
+        </div>
       </div>
 
-      <style jsx>{`
-        .wrap { min-height: 100dvh; display: grid; place-items: start center; padding: 24px; background: var(--bg, #0b0c0d); }
-        .card { width: min(100%, 980px); background: #fff; color: #111; border-radius: 18px; padding: 20px 20px 28px; box-shadow: 0 6px 24px rgba(0,0,0,0.1); }
-        :global(html[data-theme='dark']) .card { background: #121416; color: #e8eaed; }
-        h1 { margin: 0 0 4px; font-size: 22px; line-height: 1.2; }
-        .muted { color: #6b7280; margin: 0 0 16px; }
-        .small { font-size: 12px; margin-top: 6px; }
-        .presets { margin: 6px 0 12px; }
-        .select { min-width: 260px; padding: 8px 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; color: #111; }
-        :global(html[data-theme='dark']) .select { background: #0f1115; color: #e8eaed; border-color: #1f2937; }
-        .form { display: grid; gap: 12px; margin-bottom: 16px; }
-        .label { display: grid; gap: 8px; font-weight: 600; }
-        .textarea {
-          width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 13px; padding: 10px 12px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #111;
-        }
-        :global(html[data-theme='dark']) .textarea { background: #0f1115; color: #e8eaed; border-color: #1f2937; }
-        .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .checkbox { display: flex; align-items: center; gap: 8px; font-size: 14px; }
-        .button { appearance: none; border: 0; border-radius: 12px; padding: 10px 14px; font-weight: 600; cursor: pointer; background: #6DAF75; color: white; }
-        .button.secondary { background: #e5e7eb; color: #111827; }
-        .button.tertiary { background: #f3f4f6; color: #111827; }
-        .button[disabled] { opacity: 0.6; cursor: default; }
-        .badges { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
-        .chip { display: inline-block; padding: 4px 8px; font-size: 12px; border-radius: 999px; background: #e5e7eb; color: #111827; }
-        .chip-id code { font-size: 11px; }
-        .error { margin-top: 12px; padding: 12px; border-radius: 12px; background: #fee2e2; color: #7f1d1d; border: 1px solid #fecaca; }
-        .result { margin-top: 16px; }
-        .kv { display: grid; grid-template-columns: 140px 1fr; row-gap: 6px; column-gap: 12px; margin: 8px 0 16px; }
-        .k { color: #6b7280; } .v { font-weight: 600; }
-        .blocks { margin-top: 8px; }
-        .block { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin: 10px 0; background: #fafafa; }
-        :global(html[data-theme='dark']) .block { background: #0f1115; border-color: #1f2937; }
-        .blockHead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-        .list { margin: 8px 0 0 16px; }
-        .raw summary { cursor: pointer; font-size: 12px; color: #6b7280; margin-top: 8px; }
-        .pre { overflow-x: auto; border-radius: 12px; border: 1px solid #e5e7eb; padding: 12px; background: #0f1115; color: #e8eaed; }
-        .updated { margin-top: 16px; }
-        .diffs { margin-top: 8px; }
-        .del { text-decoration: line-through; opacity: 0.75; }
-        .ins { font-weight: 600; }
-      `}</style>
+      {/* Actions */}
+      <div className="flex gap-2">
+        <button className="px-3 py-2 rounded bg-black text-white disabled:opacity-50"
+                disabled={loading}
+                onClick={() => run(true)}>
+          Run (deterministic)
+        </button>
+        <button className="px-3 py-2 rounded border disabled:opacity-50"
+                disabled={loading}
+                onClick={() => run(false)}>
+          Run (LLM path)
+        </button>
+        <button className="px-3 py-2 rounded border"
+                onClick={reset}>
+          Reset to preset
+        </button>
+      </div>
+
+      {/* Badges */}
+      {resp && (
+        <div className="text-sm text-gray-700">
+          <div>usedLLM: <b>{String(resp.usedLLM)}</b></div>
+          {resp.curatedSource && <div>curatedSource: <code>{resp.curatedSource}</code></div>}
+          {resp.agentInstructionsSource && <div>agentInstructionsSource: <code>{resp.agentInstructionsSource}</code></div>}
+        </div>
+      )}
+
+      {/* Preview panes */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="border rounded p-3">
+          <h2 className="font-semibold mb-2">Agent Preface (llm_preface)</h2>
+          <pre className="whitespace-pre-wrap text-sm">
+            {resp?.llm_preface || "—"}
+          </pre>
+        </div>
+        <div className="border rounded p-3">
+          <h2 className="font-semibold mb-2">Blocks → Steps (curated)</h2>
+          <pre className="whitespace-pre-wrap text-sm">
+            {(() => {
+              const steps = resp?.result?.blocks?.find((b: any) => b?.type === "steps");
+              if (!steps) return "—";
+              const title = steps.title ? `${steps.title}\n\n` : "";
+              const lines = (steps.lines || []).map((l: string) => `• ${l}`).join("\n");
+              return title + lines;
+            })()}
+          </pre>
+        </div>
+      </div>
     </div>
   );
 }
