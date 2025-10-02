@@ -1,9 +1,22 @@
+// app/api/agent/llm/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getCuratedInstructions } from "@/lib/tools/curatedInstructions";
-import { runDeterministic } from "@/lib/agent/runLLM"; // same export name used for Option A deterministic
 import { headers } from "next/headers";
+import { getCuratedInstructions } from "@/lib/tools/curatedInstructions";
 
 export const dynamic = "force-dynamic";
+
+// Late-bind the deterministic runner so we can tolerate different export shapes.
+// Accepts: named runDeterministic, named runLLM, or default export.
+type Runner = (bus: any, extras?: any) => Promise<any> | any;
+
+async function loadDeterministicRunner(): Promise<Runner> {
+  const mod: any = await import("@/lib/agent/runLLM");
+  const fn: any = mod?.runDeterministic || mod?.runLLM || mod?.default;
+  if (typeof fn !== "function") {
+    throw new Error("runDeterministic_not_found");
+  }
+  return fn as Runner;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,11 +35,13 @@ export async function POST(req: NextRequest) {
     const bus = body?.bus ?? {};
     const hasKey = !!process.env.OPENAI_API_KEY;
 
-    // Curated file (tone-aware) — computed first, later injected into blocks by Option A
+    // Resolve curated instructions (tone-aware) first; injected by runner.
     const curated = await getCuratedInstructions(bus);
 
+    // Keep parity: Option A (deterministic) is the baseline for severity/decision.
     const useDeterministic = force === "false" || !hasKey;
-    const result = await runDeterministic(bus, { curated }); // Option A remains the parity baseline
+    const runDeterministic = await loadDeterministicRunner();
+    const result = await runDeterministic(bus, { curated });
 
     const payload: any = {
       ok: true,
