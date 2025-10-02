@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 3591b05 — 19E-2B: apply Markdown placeholders in curated steps before enrichment
-- **Updated (America/Chicago)**: 2025-10-01 22:23 CT
+- **Latest commit**: 437dd23 — Curated instructions: robust loader + Markdown parser + placeholders (incl. {{county_name}})
+- **Updated (America/Chicago)**: 2025-10-02 10:22 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
