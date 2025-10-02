@@ -1,4 +1,3 @@
-// lib/tools/curatedInstructions.ts
 import fs from "node:fs/promises";
 import path from "node:path";
 import { speciesToGroup } from "@/lib/data/speciesGroups";
@@ -43,11 +42,11 @@ function preferredCandidates(bus: Bus): { relPaths: string[] } {
   const decision = cleanSlug(bus?.triage?.decision) || "default";
   const species = cleanSlug(bus?.animal?.species_slug) || null;
   const group = speciesToGroup(species) || null;
-  const tone = resolveTone(bus); // e.g., 'supportive' | null
+  const tone = resolveTone(bus);
 
   const relPaths: string[] = [];
 
-  // ORDER: species.tone → group.tone → default.tone → species → group → default
+  // ORDER (general): species.tone → group.tone → default.tone → species → group → default
   if (tone) {
     if (species) relPaths.push(`${mode}/${decision}.${species}.${tone}.md`);
     if (group)   relPaths.push(`${mode}/${decision}.${group}.${tone}.md`);
@@ -57,8 +56,13 @@ function preferredCandidates(bus: Bus): { relPaths: string[] } {
   if (group)    relPaths.push(`${mode}/${decision}.${group}.md`);
                 relPaths.push(`${mode}/${decision}.default.md`);
 
-  // Mode-specific general fallbacks (already in your code path)
+  // Mode-specific **extras**:
   if (mode === "referral") {
+    // Prefer top-level group files (we created `referral/raptor.supportive.md`)
+    if (tone && group) relPaths.unshift(`referral/${group}.${tone}.md`);
+    if (group)         relPaths.push(`referral/${group}.md`);
+
+    // Keep existing defaults
     if (tone) relPaths.unshift(`referral/default.${tone}.md`);
     relPaths.push(`referral/default.md`);
   } else if (mode === "patient_status") {
