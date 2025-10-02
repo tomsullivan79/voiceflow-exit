@@ -8,3 +8,4 @@ You’re doing the right thing. Small mammals stress easily—calm, quiet handli
 4) Keep people and pets **well away**.  
 5) Contact the **recommended small-mammal partner** below for instructions and transport guidance.  
 6) If anything feels unsafe, **step back and wait** for professional help.
+_Local context:_ ZIP **{{zip}}**, **{{county}}** ({{county_name}}).
