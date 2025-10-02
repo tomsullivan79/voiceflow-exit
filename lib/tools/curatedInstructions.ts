@@ -46,7 +46,8 @@ function preferredCandidates(bus: Bus): { relPaths: string[] } {
 
   const relPaths: string[] = [];
 
-  // ORDER (general): species.tone → group.tone → default.tone → species → group → default
+  // General order for triage/patient_status:
+  // species.tone → group.tone → default.tone → species → group → default
   if (tone) {
     if (species) relPaths.push(`${mode}/${decision}.${species}.${tone}.md`);
     if (group)   relPaths.push(`${mode}/${decision}.${group}.${tone}.md`);
@@ -56,18 +57,20 @@ function preferredCandidates(bus: Bus): { relPaths: string[] } {
   if (group)    relPaths.push(`${mode}/${decision}.${group}.md`);
                 relPaths.push(`${mode}/${decision}.default.md`);
 
-  // Mode-specific **extras**:
+  // Referral-mode extras: prefer top-level group before default
   if (mode === "referral") {
-    // Prefer top-level group files (we created `referral/raptor.supportive.md`)
-    if (tone && group) relPaths.unshift(`referral/${group}.${tone}.md`);
-    if (group)         relPaths.push(`referral/${group}.md`);
-
-    // Keep existing defaults
-    if (tone) relPaths.unshift(`referral/default.${tone}.md`);
-    relPaths.push(`referral/default.md`);
+    const referralModeOrder: string[] = [];
+    if (tone && group) referralModeOrder.push(`referral/${group}.${tone}.md`);
+    if (tone)          referralModeOrder.push(`referral/default.${tone}.md`);
+    if (group)         referralModeOrder.push(`referral/${group}.md`);
+                       referralModeOrder.push(`referral/default.md`);
+    // Prepend these to the search list (keep their internal order)
+    relPaths.unshift(...referralModeOrder);
   } else if (mode === "patient_status") {
-    if (tone) relPaths.unshift(`patient_status/default.${tone}.md`);
-    relPaths.push(`patient_status/default.md`);
+    const psOrder: string[] = [];
+    if (tone) psOrder.push(`patient_status/default.${tone}.md`);
+              psOrder.push(`patient_status/default.md`);
+    relPaths.unshift(...psOrder);
   }
 
   return { relPaths };
