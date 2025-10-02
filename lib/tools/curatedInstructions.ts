@@ -1,28 +1,27 @@
+// lib/tools/curatedInstructions.ts
 import fs from "node:fs/promises";
 import path from "node:path";
+import { speciesToGroup } from "@/lib/data/speciesGroups";
 
 type Bus = {
   mode?: "triage" | "patient_status" | "referral" | string;
   overlays?: { tone_overlay?: string | null } | null;
-  mode_overlay?: string | null; // backward/alt control (e.g., 'supportive')
+  mode_overlay?: string | null;
   animal?: { species_slug?: string | null } | null;
   triage?: { decision?: string | null } | null;
-  // placeholders used by the renderer
   caller?: { zip?: string | null; county?: string | null } | null;
   org?: { site_code?: string | null; timezone?: string | null } | null;
 };
 
 export type CuratedResult = {
   content: string | null;
-  sourcePath: string | null;      // e.g., "triage/dispatch.big-brown-bat.md"
-  placeholderApplied: boolean;    // surfaced under ?debug=1
+  sourcePath: string | null;
+  placeholderApplied: boolean;
 };
 
-// --- Config ---
 const ROOT = process.cwd();
 const CONTENT_DIR = path.join(ROOT, "content", "instructions");
 
-// Known “decision” keys are derived earlier; stay permissive here.
 function cleanSlug(v?: string | null): string | null {
   if (!v) return null;
   return String(v).trim().toLowerCase().replace(/\s+/g, "-");
@@ -30,15 +29,12 @@ function cleanSlug(v?: string | null): string | null {
 
 function countyNameOnly(county?: string | null): string | null {
   if (!county) return null;
-  const trimmed = county.trim();
-  // Strip common suffixes: County, Parish, Borough, Municipio (order matters, case-insensitive)
-  return trimmed.replace(/\s+(County|Parish|Borough|Municipio)$/i, "");
+  return county.trim().replace(/\s+(County|Parish|Borough|Municipio)$/i, "");
 }
 
 function resolveTone(bus: Bus): string | null {
   const oTone = bus?.overlays?.tone_overlay?.trim().toLowerCase() || null;
   const alt = bus?.mode_overlay?.trim().toLowerCase() || null;
-  // allow alt switch 'supportive' to behave like tone_overlay
   return oTone || (alt === "supportive" ? "supportive" : null);
 }
 
@@ -46,29 +42,23 @@ function preferredCandidates(bus: Bus): { relPaths: string[] } {
   const mode = bus?.mode || "triage";
   const decision = cleanSlug(bus?.triage?.decision) || "default";
   const species = cleanSlug(bus?.animal?.species_slug) || null;
+  const group = speciesToGroup(species) || null;
   const tone = resolveTone(bus); // e.g., 'supportive' | null
 
-  // NOTE: we keep existing resolution order and *prepend* tone-specific variants
   const relPaths: string[] = [];
 
-  // 1) Tone + species (most specific)
-  if (tone && species) {
-    relPaths.push(`${mode}/${decision}.${species}.${tone}.md`);
-  }
-  // 2) Tone + default
+  // ORDER: species.tone → group.tone → default.tone → species → group → default
   if (tone) {
-    relPaths.push(`${mode}/${decision}.default.${tone}.md`);
+    if (species) relPaths.push(`${mode}/${decision}.${species}.${tone}.md`);
+    if (group)   relPaths.push(`${mode}/${decision}.${group}.${tone}.md`);
+                 relPaths.push(`${mode}/${decision}.default.${tone}.md`);
   }
-  // 3) Species (no tone)
-  if (species) {
-    relPaths.push(`${mode}/${decision}.${species}.md`);
-  }
-  // 4) Default (no tone)
-  relPaths.push(`${mode}/${decision}.default.md`);
+  if (species)  relPaths.push(`${mode}/${decision}.${species}.md`);
+  if (group)    relPaths.push(`${mode}/${decision}.${group}.md`);
+                relPaths.push(`${mode}/${decision}.default.md`);
 
-  // Special-case fallbacks by mode:
+  // Mode-specific general fallbacks (already in your code path)
   if (mode === "referral") {
-    // explicit referral files if used elsewhere (we’ll add more in 19E-3)
     if (tone) relPaths.unshift(`referral/default.${tone}.md`);
     relPaths.push(`referral/default.md`);
   } else if (mode === "patient_status") {
@@ -98,7 +88,7 @@ function applyPlaceholders(raw: string, bus: Bus): { text: string; applied: bool
   const decision = bus?.triage?.decision ?? "";
   const org_site = bus?.org?.site_code ?? "";
   const org_timezone = bus?.org?.timezone ?? "";
-  const urgency = ""; // reserved / computed upstream
+  const urgency = "";
 
   let text = raw;
   const before = text;
@@ -115,19 +105,14 @@ function applyPlaceholders(raw: string, bus: Bus): { text: string; applied: bool
     "{{org_timezone}}": String(org_timezone),
   };
 
-  // strip HTML comments that authors may leave in curated files
   text = text.replace(/<!--[\s\S]*?-->/g, "");
-
-  for (const [k, v] of Object.entries(map)) {
-    text = text.split(k).join(v);
-  }
+  for (const [k, v] of Object.entries(map)) text = text.split(k).join(v);
 
   return { text, applied: text !== before };
 }
 
 export async function getCuratedInstructions(bus: Bus): Promise<CuratedResult> {
   const { relPaths } = preferredCandidates(bus);
-
   for (const rel of relPaths) {
     const raw = await tryRead(rel);
     if (raw) {
@@ -135,6 +120,5 @@ export async function getCuratedInstructions(bus: Bus): Promise<CuratedResult> {
       return { content: text, sourcePath: rel, placeholderApplied: applied };
     }
   }
-
   return { content: null, sourcePath: null, placeholderApplied: false };
 }
