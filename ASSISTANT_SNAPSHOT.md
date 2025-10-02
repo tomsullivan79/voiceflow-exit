@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: aa7044a — 19E-2C: inject curated Markdown into steps block post-run (route-level merge)
-- **Updated (America/Chicago)**: 2025-10-02 11:19 CT
+- **Latest commit**: c95777c — 19E-3: referral-mode curated Markdown (default + supportive) and tests
+- **Updated (America/Chicago)**: 2025-10-02 11:37 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -135,6 +135,7 @@ White_Sage.png
 content/
   instructions/
     patient_status/
+    referral/
     triage/
     README.md
 cookiejar.txt
