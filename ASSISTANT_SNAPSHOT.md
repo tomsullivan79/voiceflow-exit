@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: 5de4337 — 21C: add context placeholders to small-mammal curated docs (zip/county/county_name)
-- **Updated (America/Chicago)**: 2025-10-02 15:45 CT
+- **Latest commit**: ede8914 — 21D: add in-memory TTL cache for curated/agent instructions; expose cacheHit flags in debug
+- **Updated (America/Chicago)**: 2025-10-02 15:56 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
