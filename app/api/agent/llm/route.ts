@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
     // Normalize shapes in updatedBus + referral URLs/titles
     result = normalizeResult(result, bus);
 
-    // Curated steps injection (Markdown → steps.lines), track source for debug
+    // Curated steps injection (Markdown → steps.lines), with placeholders BEFORE enrichment
     const mergedBusForContent = mergeForEnrich(bus, result.updatedBus);
     const curated = await loadCuratedSteps(mergedBusForContent);
     let curatedSource: string | null = null;
@@ -136,13 +136,12 @@ export async function POST(req: NextRequest) {
         };
         result.blocks.push(steps);
       }
-      // Apply placeholders to curated lines
       const filled = applyCuratedPlaceholders(curated.lines, mergedBusForContent);
-      steps.lines = Array.isArray(steps.lines) ? filled : filled;
+      steps.lines = filled; // <— ensure we replace the entire lines array with filled placeholders
       if (curated.title) steps.title = curated.title;
     }
 
-    // Public-health contact enrichment last (appends neatly)
+    // Public-health contact enrichment last (appends neatly after curated lines)
     result.blocks = await enrichDispatchSteps(result.blocks, mergedBusForContent);
 
     // Build response; expose curatedSource only when debug=1
