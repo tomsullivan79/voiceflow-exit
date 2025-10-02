@@ -1,163 +1,50 @@
-// app/api/agent/llm/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { enrichDispatchSteps } from '@/lib/tools/enrichDispatchSteps';
-import { runOptionA } from '@/lib/agent/runOptionA';
-import { normalizeResult } from '@/lib/agent/normalizeResult';
-import { loadCuratedSteps, applyCuratedPlaceholders } from '@/lib/tools/curatedInstructions';
+import { NextRequest, NextResponse } from "next/server";
+import { getCuratedInstructions } from "@/lib/tools/curatedInstructions";
+import { runDeterministic } from "@/lib/agent/runLLM"; // same export name used for Option A deterministic
+import { headers } from "next/headers";
 
-export const runtime = 'nodejs';
-
-function makeReqId() {
-  return globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
-}
-
-// Resolve runLLM regardless of export shape (named or default)
-async function getRunLLM(): Promise<(bus: any) => Promise<{ blocks: any[]; updatedBus?: any }>> {
-  const mod: any = await import('@/lib/agent/runLLM');
-  const fn = mod?.runLLM ?? mod?.default;
-  if (typeof fn !== 'function') throw new Error('runLLM_not_found');
-  return fn;
-}
-
-// Titles + referral.validated normalization for blocks
-function normalizeBlocks(blocks: any[] = [], decision?: string) {
-  for (const b of blocks) {
-    if (b?.type === 'summary') b.title = 'Triage Summary';
-    if (b?.type === 'steps') {
-      b.title = decision === 'dispatch' ? 'Public Health — Do this now' : 'Do this next';
-    }
-    if (b?.type === 'referral') b.title = b.title || 'Referral';
-  }
-  const referral = blocks.find((b) => b?.type === 'referral');
-  if (referral?.target && referral.validated !== true) referral.validated = true;
-  return blocks;
-}
-
-function hasApiKey() {
-  return !!process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'undefined';
-}
-
-// Merge base bus + updatedBus so enrichment/curation have full context
-function mergeForEnrich(base: any, patch: any) {
-  if (!patch) return base;
-  return {
-    ...base,
-    ...patch,
-    caller: { ...(base?.caller || {}), ...(patch?.caller || {}) },
-    triage: { ...(base?.triage || {}), ...(patch?.triage || {}) },
-    referral: { ...(base?.referral || {}), ...(patch?.referral || {}) },
-    exposure: { ...(base?.exposure || {}), ...(patch?.exposure || {}) },
-    org: { ...(base?.org || {}), ...(patch?.org || {}) },
-    system: { ...(base?.system || {}), ...(patch?.system || {}) },
-    species_flags: { ...(base?.species_flags || {}), ...(patch?.species_flags || {}) },
-  };
-}
-
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const ping = searchParams.get('ping');
-  const reqId = makeReqId();
-
-  if (ping === '1') {
-    return new NextResponse(JSON.stringify({ ok: true, usedLLM: false, pong: true }), {
-      status: 200,
-      headers: { 'content-type': 'application/json', 'x-request-id': reqId },
-    });
-  }
-
-  return new NextResponse(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { 'content-type': 'application/json', 'x-request-id': reqId },
-  });
-}
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const reqId = makeReqId();
   try {
-    const { searchParams } = new URL(req.url);
-    const force = searchParams.get('force');          // 'false' => deterministic
-    const debug = searchParams.get('debug') === '1';  // include llm_error_detail / curatedSource
-    const useLLM = !(force === 'false') && hasApiKey();
+    const url = new URL(req.url);
+    const debug = url.searchParams.get("debug") === "1";
+    const ping = url.searchParams.get("ping") === "1";
+    const force = url.searchParams.get("force"); // "false" => deterministic
+    const hdrs = headers();
+    const xreq = hdrs.get("x-request-id") || undefined;
 
-    const { bus } = (await req.json()) as { bus: any };
-    if (!bus) {
-      return new NextResponse(JSON.stringify({ ok: false, error: 'Missing bus' }), {
-        status: 400,
-        headers: { 'content-type': 'application/json', 'x-request-id': reqId },
-      });
+    if (ping) {
+      return NextResponse.json({ ok: true, ping: "pong", x_request_id: xreq });
     }
 
-    let usedLLM = false;
-    let fallback: string | null = null;
-    let result: { blocks: any[]; updatedBus?: any } = { blocks: [], updatedBus: bus };
-    let llm_error_detail: any = null;
+    const body = await req.json();
+    const bus = body?.bus ?? {};
+    const hasKey = !!process.env.OPENAI_API_KEY;
 
-    if (useLLM) {
-      usedLLM = true;
-      const timeout = new Promise<never>((_, rej) => setTimeout(() => rej(new Error('llm_timeout')), 20_000));
-      try {
-        const runLLM = await getRunLLM();
-        result = await Promise.race([runLLM(bus), timeout]);
-      } catch (e: any) {
-        result = await runOptionA(bus);
-        fallback = e?.message === 'llm_timeout' ? 'llm_timeout' : 'llm_error';
-        if (debug && fallback === 'llm_error') {
-          llm_error_detail = {
-            name: e?.name ?? null,
-            status: e?.status ?? null,
-            code: e?.code ?? null,
-            message: e?.message ?? String(e),
-          };
-        }
-      }
-    } else {
-      result = await runOptionA(bus);
+    // Curated file (tone-aware) — computed first, later injected into blocks by Option A
+    const curated = await getCuratedInstructions(bus);
+
+    const useDeterministic = force === "false" || !hasKey;
+    const result = await runDeterministic(bus, { curated }); // Option A remains the parity baseline
+
+    const payload: any = {
+      ok: true,
+      usedLLM: !useDeterministic && hasKey ? true : false,
+      result,
+    };
+
+    if (debug) {
+      payload.curatedSource = curated.sourcePath;
+      payload.placeholderApplied = curated.placeholderApplied;
+      payload.x_request_id = xreq;
     }
 
-    // Normalize block titles/referral.validated
-    const decision: string | undefined = result?.updatedBus?.triage?.decision;
-    result.blocks = normalizeBlocks(result.blocks, decision);
-
-    // Normalize shapes in updatedBus + referral URLs/titles
-    result = normalizeResult(result, bus);
-
-    // Curated steps injection (Markdown → steps.lines), with placeholders BEFORE enrichment
-    const mergedBusForContent = mergeForEnrich(bus, result.updatedBus);
-    const curated = await loadCuratedSteps(mergedBusForContent);
-    let curatedSource: string | null = null;
-    if (curated) {
-      curatedSource = curated.source;
-      let steps = result.blocks.find((b) => b?.type === 'steps');
-      if (!steps) {
-        steps = {
-          type: 'steps',
-          title: decision === 'dispatch' ? 'Public Health — Do this now' : 'Do this next',
-          lines: []
-        };
-        result.blocks.push(steps);
-      }
-      const filled = applyCuratedPlaceholders(curated.lines, mergedBusForContent);
-      steps.lines = filled; // <— ensure we replace the entire lines array with filled placeholders
-      if (curated.title) steps.title = curated.title;
-    }
-
-    // Public-health contact enrichment last (appends neatly after curated lines)
-    result.blocks = await enrichDispatchSteps(result.blocks, mergedBusForContent);
-
-    // Build response; expose curatedSource only when debug=1
-    const payload: any = { ok: true, usedLLM, fallback, result };
-    if (llm_error_detail) payload.llm_error_detail = llm_error_detail;
-    if (debug) payload.curatedSource = curatedSource;
-
-    return new NextResponse(JSON.stringify(payload), {
-      status: 200,
-      headers: { 'content-type': 'application/json', 'x-request-id': reqId },
-    });
+    return NextResponse.json(payload);
   } catch (err: any) {
-    const error = err?.message ?? 'Server error';
-    return new NextResponse(JSON.stringify({ ok: false, error }), {
-      status: 500,
-      headers: { 'content-type': 'application/json', 'x-request-id': reqId },
-    });
+    return NextResponse.json(
+      { ok: false, error: err?.message || "unknown_error" },
+      { status: 500 }
+    );
   }
 }
