@@ -6,8 +6,8 @@
 ## Repo & Build
 - **Repo**: https://github.com/tomsullivan79/voiceflow-exit
 - **Default branch**: main
-- **Latest commit**: ed0ac81 — 20D: prepend global agent safety include (_safety.md) to agent instructions and llm_preface
-- **Updated (America/Chicago)**: 2025-10-02 15:12 CT
+- **Latest commit**: e639a9b — 20E: tests for agent resolver order and global _safety.md prepend
+- **Updated (America/Chicago)**: 2025-10-02 15:17 CT
 - **Prod URL**: https://app.wildtriage.org/  (if applicable)
 
 > When you (Chat) start a session, verify the latest commit SHA matches what Tom pasted in the Session Starter or what `/api/version` reports in prod (if available). If it doesn’t match, stop and ask.
@@ -163,6 +163,7 @@ scripts/
   update-assistant-snapshot.mjs
   vercel-ignore.sh
 tests/
+  agentInstructions.resolver.test.ts
   curatedInstructions.placeholders.test.ts
 tsconfig.json
 tsconfig.tsbuildinfo
